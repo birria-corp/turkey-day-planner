@@ -1,0 +1,75 @@
+rules_version = '2';
+// ─────────────────────────────────────────────────────────────────────────
+// turkey-day-planner Firestore rules (Firebase project turkey-day-planner).
+// This project is not shared with other apps, so this file is the source of
+// truth and can be deployed as-is.
+//
+// Model (v0.2.0, MVP):
+//   - OWNER: one user, pinned by uid below. Replace OWNER_UID_GOES_HERE with the
+//     ID the app shows after Spencer signs in. No emails live in this public repo.
+//   - members/{uid}: the family allowlist. Only the owner writes it.
+//     role = 'cook' (can edit) or 'viewer' (read-only, can tick shopping items).
+//   - requests/{uid}: a signed-in person asks for access; the owner approves by
+//     creating members/{uid}.
+//   - Everything else (events, recipes): any member reads, cooks and owner write.
+// ─────────────────────────────────────────────────────────────────────────
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+    function isOwner() {
+      return signedIn() && request.auth.uid == 'OWNER_UID_GOES_HERE';
+    }
+    function memberDoc() {
+      return get(/databases/$(database)/documents/members/$(request.auth.uid));
+    }
+    function isMember() {
+      return signedIn() && (isOwner() ||
+        exists(/databases/$(database)/documents/members/$(request.auth.uid)));
+    }
+    function canEdit() {
+      return isOwner() || (isMember() && memberDoc().data.role == 'cook');
+    }
+
+    // Family allowlist
+    match /members/{uid} {
+      allow read: if isOwner() || (signedIn() && request.auth.uid == uid);
+      allow write: if isOwner();
+    }
+
+    // Access requests
+    match /requests/{uid} {
+      allow create, update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['name', 'email', 'requestedAt']);
+      allow read, delete: if isOwner() || (signedIn() && request.auth.uid == uid);
+    }
+
+    // Recipe library
+    match /recipes/{recipeId} {
+      allow read: if isMember();
+      allow write: if canEdit();
+    }
+
+    // Events and their subcollections (meals, dishes, steps, shopping)
+    match /events/{eventId} {
+      allow read: if isMember();
+      allow write: if canEdit();
+
+      match /shopping/{itemId} {
+        allow read: if isMember();
+        allow create, delete: if canEdit();
+        // Any member (including viewers) may tick items off.
+        allow update: if canEdit() || (isMember()
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['checked', 'checkedBy']));
+      }
+
+      match /{sub}/{docId} {
+        allow read: if isMember();
+        allow write: if canEdit();
+      }
+    }
+  }
+}

@@ -2,7 +2,7 @@
 
 Plan Thanksgiving cooking backward from serve time: dinners, dishes, recipes, shopping list, and a day-by-day order of operations. Replaces the yearly Google Sheet.
 
-**Version:** 0.1.0
+**Version:** 0.2.0
 **Live:** https://birria-corp.github.io/turkey-day-planner/ (after first deploy)
 
 ---
@@ -27,10 +27,12 @@ turkey-day-planner/
 ├── index.html            Vite entry
 ├── vite.config.js        base path for GitHub Pages
 ├── package.json
-├── version.json          { "version": "0.1.0" }
+├── version.json          { "version": "0.2.0" }
+├── firestore.rules       Source of truth for rules (owner uid to pin)
 ├── src/
 │   ├── main.jsx
-│   ├── App.jsx
+│   ├── App.jsx           Sign-in screen, access request
+│   ├── firebase.js       Config, Google auth, Firestore + offline cache
 │   └── scheduler/
 │       ├── dates.js      Thanksgiving date, event range, weekday labels
 │       └── dates.test.js
@@ -76,4 +78,5 @@ npm run build    # production build into dist/
 
 | Version | Changes |
 |---------|---------|
+| v0.2.0 | Google sign-in (popup on desktop, redirect on mobile), Firestore connection with offline cache, access-request flow, `firestore.rules` draft (owner uid still to pin) |
 | v0.1.0 | Scaffold: React + Vite, GitHub Pages deploy workflow, calendar helpers with tests |
