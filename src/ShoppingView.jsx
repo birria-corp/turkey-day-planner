@@ -49,7 +49,7 @@ export default function ShoppingView({ eventId, dishes, canEdit }) {
     setTimeout(() => setNote(''), 4000);
   };
 
-  // The whole list, one item per line under aisle headings, ready to paste into Google Keep.
+  // What is still to buy (not ticked "have"), one item per line under aisle headings, ready to paste into Google Keep.
   const copyForKeep = async () => {
     const ok = await copyText(buildKeepText(items));
     flash(ok ? 'Copied. Open Google Keep, start a new list or note and paste.' : 'Could not copy. Try the Share button or print instead.');

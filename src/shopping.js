@@ -205,16 +205,17 @@ function toBase(qty, unit) {
 
 /**
  * Plain text for Google Keep: an aisle heading line, then one item per line ("2 lb Brussels sprouts").
- * No blank lines (each would become an empty checkbox). Items already ticked as "have" end with "(have)".
+ * No blank lines (each would become an empty checkbox). Items ticked as "have" at home are left out:
+ * only what is still to buy is copied.
  */
 export function buildKeepText(items) {
   const lines = [];
-  for (const [aisle, groups] of groupByAisle(items)) {
+  for (const [aisle, groups] of groupByAisle(items.filter((i) => !i.have))) {
     lines.push(aisle.toUpperCase());
     for (const [, list] of groups) {
       for (const i of list) {
         const asNeeded = i.qtyText === 'as needed';
-        lines.push(`${asNeeded ? '' : `${i.qtyText} `}${i.name}${asNeeded ? ' (as needed)' : ''}${i.have ? ' (have)' : ''}`);
+        lines.push(`${asNeeded ? '' : `${i.qtyText} `}${i.name}${asNeeded ? ' (as needed)' : ''}`);
       }
     }
   }

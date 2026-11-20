@@ -97,11 +97,10 @@ describe('Keep text', () => {
   ];
   const text = buildKeepText(items);
 
-  it('has an aisle heading line, then one item per line, with no blank lines', () => {
+  it('leaves out items already at home, has aisle headings, one item per line, no blank lines', () => {
     expect(text.split('\n')).toEqual([
       'PRODUCE',
       '2 Apples',
-      '2 lb Brussels sprouts (have)',
       'SPICES',
       'Salt (as needed)',
     ]);
