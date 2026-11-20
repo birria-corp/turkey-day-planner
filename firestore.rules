@@ -5,8 +5,8 @@ rules_version = '2';
 // truth and can be deployed as-is.
 //
 // Model (v0.2.0, MVP):
-//   - OWNER: one user, pinned by uid below. Replace OWNER_UID_GOES_HERE with the
-//     ID the app shows after Spencer signs in. No emails live in this public repo.
+//   - OWNER: one user, pinned by uid below (the ID the app shows after Spencer
+//     signs in). No emails live in this public repo.
 //   - members/{uid}: the family allowlist. Only the owner writes it.
 //     role = 'cook' (can edit) or 'viewer' (read-only, can tick shopping items).
 //   - requests/{uid}: a signed-in person asks for access; the owner approves by
@@ -20,7 +20,7 @@ service cloud.firestore {
       return request.auth != null;
     }
     function isOwner() {
-      return signedIn() && request.auth.uid == 'OWNER_UID_GOES_HERE';
+      return signedIn() && request.auth.uid == 'enVCX2fxmbMOHfPSOHcWBdvtgZi1';
     }
     function memberDoc() {
       return get(/databases/$(database)/documents/members/$(request.auth.uid));
