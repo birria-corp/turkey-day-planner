@@ -14,7 +14,7 @@ import DinnerPanel from './DinnerPanel.jsx';
 import MenuView from './MenuView.jsx';
 import ShoppingView from './ShoppingView.jsx';
 import { EVENT_COLOR, dishColor, sortDishes } from './palette.js';
-import { KIND_MARKER, stepLabel } from './labels.js';
+import { KIND_MARKER, shortLabel, stepLabel } from './labels.js';
 import { addMinutes, dayKey, fmtDayHeading, fmtTime } from './scheduler/time.js';
 
 const SAMPLE_YEAR = 2026;
@@ -133,6 +133,7 @@ export default function EventView({ isOwner, canEdit, ownerUid }) {
     [detail],
   );
   const labelOf = useCallback((step) => stepLabel(step, dishById[step.dishId]), [dishById]);
+  const shortOf = useCallback((step) => shortLabel(step, dishById[step.dishId]), [dishById]);
 
   function pick(setter, key, value) {
     setter(value);
@@ -264,6 +265,7 @@ export default function EventView({ isOwner, canEdit, ownerUid }) {
                       steps={detail.steps}
                       colorOf={colorOf}
                       labelOf={labelOf}
+                      shortOf={shortOf}
                       side={
                         <DinnerPanel
                           meals={detail.meals}

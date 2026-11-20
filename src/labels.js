@@ -18,6 +18,20 @@ export function stepLabel(step, dish) {
   return [dish && dish.emoji, KIND_MARKER[stepKind(step)], step.text].filter(Boolean).join(' ');
 }
 
+const RESOURCE_NAME = { oven: 'Oven', stovetop: 'Stovetop', smoker: 'Smoker', fridge: 'Fridge' };
+
+/**
+ * Short label for the grid: "🦃 🔪 Prep", "🥔 🔥 Cook · Stovetop", "⏲️ Rest". Errands keep their
+ * text ("Shopping"). The full description shows on hover, in the Timeline and in the Menu tab.
+ */
+export function shortLabel(step, dish) {
+  const kind = stepKind(step);
+  if (kind === 'event') return [KIND_MARKER.event, step.text].join(' ');
+  const resource = kind === 'cook' ? RESOURCE_NAME[step.resource] : '';
+  const word = resource ? `${KIND_NAME[kind]} · ${resource}` : KIND_NAME[kind];
+  return [dish && dish.emoji, KIND_MARKER[kind], word].filter(Boolean).join(' ');
+}
+
 /** 40 -> "40 min", 150 -> "2 hr 30 min", 1365 -> "22 hr 45 min". */
 export function fmtDuration(min) {
   if (min < 60) return `${min} min`;

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { toEventDocs, validateImport } from './importer.js';
-import { fmtDuration, fmtRange, stepKind, stepLabel } from './labels.js';
+import { fmtDuration, fmtRange, shortLabel, stepKind, stepLabel } from './labels.js';
 
 const menu = () => ({
   event: { name: 'Thanksgiving 2026', year: 2026, startDate: '2026-11-23', endDate: '2026-11-28' },
@@ -83,6 +83,15 @@ describe('labels', () => {
   it('builds a label from dish emoji, kind marker and text', () => {
     expect(stepLabel({ dishId: 'a', kind: 'cook', text: 'Roast' }, { emoji: '🦃' })).toBe('🦃 🔥 Roast');
     expect(stepLabel({ dishId: '', text: 'Shopping' }, undefined)).toBe('🛒 Shopping');
+  });
+  it('builds short grid labels: Prep, Cook with the appliance, Rest', () => {
+    const dish = { emoji: '🦃' };
+    expect(shortLabel({ dishId: 'a', kind: 'prep', text: 'Pan, truss, preheat', resource: 'hands' }, dish)).toBe('🦃 🔪 Prep');
+    expect(shortLabel({ dishId: 'a', kind: 'cook', text: 'Roast', resource: 'oven' }, dish)).toBe('🦃 🔥 Cook · Oven');
+    expect(shortLabel({ dishId: 'a', kind: 'cook', text: 'Gravy', resource: 'stovetop' }, dish)).toBe('🦃 🔥 Cook · Stovetop');
+    expect(shortLabel({ dishId: 'a', kind: 'cook', text: 'Finish', resource: 'hands' }, dish)).toBe('🦃 🔥 Cook');
+    expect(shortLabel({ dishId: 'a', kind: 'rest', text: 'Rest', resource: 'none' }, dish)).toBe('🦃 ⏲️ Rest');
+    expect(shortLabel({ dishId: '', kind: 'event', text: 'Shopping' }, undefined)).toBe('🛒 Shopping');
   });
   it('formats durations and ranges', () => {
     expect(fmtDuration(40)).toBe('40 min');

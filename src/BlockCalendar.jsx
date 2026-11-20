@@ -4,7 +4,8 @@ import { addMinutes, dayKey, fmtTime, parseStamp } from './scheduler/time.js';
 import { SLOT_MIN, gridRange, layoutLanes, slotLabel, withMinutes } from './scheduler/layout.js';
 
 const ROW_H = 30; // keep in sync with --row-h in theme.css
-const DAY_W = 128; // keep in sync with .cal-day width
+const MIN_DAY_W = 128; // a quiet day
+const LANE_W = 84; // width given to each side-by-side block on a busy day
 const BAR_H = 28;
 const LONG_MIN = 8 * 60;
 
@@ -25,11 +26,12 @@ export function isLongStep(step) {
 
 /**
  * Sheet-style grid: days across, time down, steps as blocks colored by dish.
- * Long steps run across the days as bars above the grid. `side` is rendered to the
- * right of the last day (the dinner column).
+ * Busy days are wider so side-by-side blocks stay readable. Long steps run across the
+ * days as bars above the grid. `shortOf` is the text on a block; `labelOf` is the full
+ * description (hover text and bars). `side` is rendered right of the last day.
  */
-export default function BlockCalendar({ event, meals, steps, colorOf, labelOf, side }) {
-  const { days, range, byDay, bars, laneCount } = useMemo(() => {
+export default function BlockCalendar({ event, meals, steps, colorOf, labelOf, shortOf, side }) {
+  const { days, range, byDay, widths, bars, laneCount } = useMemo(() => {
     const dayBlocks = steps.filter((s) => !isLongStep(s));
     const longSteps = steps.filter(isLongStep);
 
@@ -38,7 +40,8 @@ export default function BlockCalendar({ event, meals, steps, colorOf, labelOf, s
         withMinutes({
           id: `s-${s.id}`,
           kind: 'step',
-          label: labelOf(s),
+          label: shortOf(s),
+          full: labelOf(s),
           startAt: s.startAt,
           durationMin: s.durationMin,
           dishId: s.dishId,
@@ -49,6 +52,7 @@ export default function BlockCalendar({ event, meals, steps, colorOf, labelOf, s
           id: `m-${m.id}`,
           kind: 'serve',
           label: m.name.toUpperCase(),
+          full: m.name,
           startAt: m.serveAt,
           durationMin: SLOT_MIN,
         }),
@@ -69,9 +73,20 @@ export default function BlockCalendar({ event, meals, steps, colorOf, labelOf, s
     });
     const dayList = [...keys].sort();
 
+    const byDay = Object.fromEntries(dayList.map((k) => [k, layoutLanes(grouped[k] || [])]));
+    const widths = dayList.map((k) => {
+      const lanes = Math.max(1, ...byDay[k].map((b) => b.lanes));
+      return Math.max(MIN_DAY_W, lanes * LANE_W);
+    });
+    const offsets = widths.reduce((acc, w, i) => [...acc, (acc[i] || 0) + w], [0]);
+
     const range = gridRange(blocks);
     const span = range.endMin - range.startMin;
     const frac = (min) => Math.min(1, Math.max(0, (min - range.startMin) / span));
+    const px = (stamp) => {
+      const i = dayList.indexOf(dayKey(stamp));
+      return offsets[i] + frac(minuteOfDay(stamp)) * widths[i];
+    };
 
     const bars = longSteps
       .map((s) => {
@@ -81,8 +96,8 @@ export default function BlockCalendar({ event, meals, steps, colorOf, labelOf, s
           label: labelOf(s),
           dishId: s.dishId,
           title: `${labelOf(s)}: ${fmtTime(s.startAt)} to ${fmtTime(endStamp)}`,
-          from: dayList.indexOf(dayKey(s.startAt)) + frac(minuteOfDay(s.startAt)),
-          to: dayList.indexOf(dayKey(endStamp)) + frac(minuteOfDay(endStamp)),
+          from: px(s.startAt),
+          to: px(endStamp),
         };
       })
       .sort((a, b) => a.from - b.from);
@@ -98,25 +113,20 @@ export default function BlockCalendar({ event, meals, steps, colorOf, labelOf, s
       b.lane = lane;
     });
 
-    return {
-      days: dayList,
-      range,
-      byDay: Object.fromEntries(dayList.map((k) => [k, layoutLanes(grouped[k] || [])])),
-      bars,
-      laneCount: laneEnds.length,
-    };
-  }, [event, meals, steps, labelOf]);
+    return { days: dayList, range, byDay, widths, bars, laneCount: laneEnds.length };
+  }, [event, meals, steps, labelOf, shortOf]);
 
   const slots = Math.round((range.endMin - range.startMin) / SLOT_MIN);
   const height = slots * ROW_H;
   const slotMins = Array.from({ length: slots }, (_, i) => range.startMin + i * SLOT_MIN);
+  const totalWidth = widths.reduce((a, b) => a + b, 0);
 
   return (
     <div className="cal-outer">
       {bars.length > 0 && (
         <div className="cal-banner-row">
           <div className="cal-gutter banner-label">Long tasks</div>
-          <div className="cal-banner" style={{ width: days.length * DAY_W, height: laneCount * BAR_H }}>
+          <div className="cal-banner" style={{ width: totalWidth, height: laneCount * BAR_H }}>
             {bars.map((b) => {
               const c = colorOf(b.dishId);
               return (
@@ -125,8 +135,8 @@ export default function BlockCalendar({ event, meals, steps, colorOf, labelOf, s
                   className="bar"
                   title={b.title}
                   style={{
-                    left: b.from * DAY_W,
-                    width: Math.max(40, (b.to - b.from) * DAY_W),
+                    left: b.from,
+                    width: Math.max(40, b.to - b.from),
                     top: b.lane * BAR_H,
                     height: BAR_H - 3,
                     background: c.bg,
@@ -153,10 +163,10 @@ export default function BlockCalendar({ event, meals, steps, colorOf, labelOf, s
           </div>
         </div>
 
-        {days.map((key) => {
+        {days.map((key, di) => {
           const d = parseKey(key);
           return (
-            <div className="cal-day" key={key}>
+            <div className="cal-day" key={key} style={{ width: widths[di] }}>
               <div className="cal-head">
                 <span>{`${d.getMonth() + 1}/${d.getDate()}`}</span>
                 <strong>{d.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase()}</strong>
@@ -168,7 +178,7 @@ export default function BlockCalendar({ event, meals, steps, colorOf, labelOf, s
                     <div
                       key={b.id}
                       className={`block ${b.kind}`}
-                      title={`${b.label}: ${fmtTime(b.startAt)} to ${fmtTime(addMinutes(b.startAt, b.durationMin))}`}
+                      title={`${b.full}: ${fmtTime(b.startAt)} to ${fmtTime(addMinutes(b.startAt, b.durationMin))}`}
                       style={{
                         top: ((b.startMin - range.startMin) / SLOT_MIN) * ROW_H,
                         height: ((b.endMin - b.startMin) / SLOT_MIN) * ROW_H - 1,

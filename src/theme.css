@@ -88,7 +88,7 @@ button.danger { background: var(--maple); border-color: var(--maple); }
 .cal-wrap { display: flex; align-items: flex-start; gap: 16px; overflow-x: auto; padding-bottom: 12px; }
 .cal { display: flex; flex: none; }
 .cal-gutter { width: 74px; flex: none; }
-.cal-day { width: 128px; flex: none; border-left: 2px solid var(--text); }
+.cal-day { width: 128px; flex: none; border-left: 2px solid var(--text); } /* width set per day in code */
 .cal-day:last-child { border-right: 2px solid var(--text); }
 .cal-head {
   height: 52px;
@@ -125,7 +125,8 @@ button.danger { background: var(--maple); border-color: var(--maple); }
 .block {
   position: absolute;
   padding: 2px 4px;
-  font-size: 12px;
+  font-size: 14px;
+  font-weight: 600;
   line-height: 1.15;
   overflow: hidden;
   border: 1px solid rgba(0, 0, 0, 0.2);
