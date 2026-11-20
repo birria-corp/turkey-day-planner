@@ -12,8 +12,8 @@ export function withMinutes(block) {
   return { ...block, startMin, endMin: Math.min(startMin + Math.max(block.durationMin, 1), DAY_END) };
 }
 
-/** Shared time range for every day: 10 AM to 9 PM, widened to the hour around any block. */
-export function gridRange(blocks, { defaultStartHour = 10, defaultEndHour = 21 } = {}) {
+/** Shared time range for every day: 6 AM to 10 PM, widened to the hour around any block outside it. */
+export function gridRange(blocks, { defaultStartHour = 6, defaultEndHour = 22 } = {}) {
   let startMin = defaultStartHour * 60;
   let endMin = defaultEndHour * 60;
   for (const b of blocks) {

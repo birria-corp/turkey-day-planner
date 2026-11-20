@@ -109,12 +109,16 @@ describe('time helpers', () => {
 });
 
 describe('gridRange', () => {
-  it('defaults to 10 AM to 9 PM', () => {
-    expect(gridRange([])).toEqual({ startMin: 600, endMin: 1260 });
+  it('defaults to 6 AM to 10 PM', () => {
+    expect(gridRange([])).toEqual({ startMin: 360, endMin: 1320 });
   });
-  it('widens to cover early and late blocks', () => {
-    const r = gridRange([blk('a', '2026-11-26T08:15', 60), blk('b', '2026-11-26T21:30', 90)]);
-    expect(r).toEqual({ startMin: 480, endMin: 1380 });
+  it('keeps 6 AM to 10 PM when blocks fall inside it', () => {
+    const r = gridRange([blk('a', '2026-11-26T08:15', 60), blk('b', '2026-11-26T21:30', 30)]);
+    expect(r).toEqual({ startMin: 360, endMin: 1320 });
+  });
+  it('widens to cover blocks outside 6 AM to 10 PM', () => {
+    const r = gridRange([blk('a', '2026-11-26T05:15', 60), blk('b', '2026-11-26T22:30', 90)]);
+    expect(r).toEqual({ startMin: 300, endMin: 1440 });
   });
 });
 

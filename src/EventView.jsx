@@ -38,6 +38,8 @@ const ROW_HEIGHTS = { compact: 30, normal: 48, large: 64 };
 const RESOURCE_WORD = { oven: 'Oven', stovetop: 'Stovetop', smoker: 'Smoker' };
 const NARROW_PX = 820; // below this width the page is laid out for a phone
 const PHONE_GUTTER = 56; // time labels column on a phone (keep in sync with theme.css)
+const PRINT_W = 970; // usable width of a landscape letter page, in CSS pixels (10.1 in)
+const PRINT_H = 650; // usable height left under the title (about 6.8 in)
 
 function readStored(key, allowed, fallback) {
   try {
@@ -173,7 +175,7 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
   const dayWrapWidth = useElementWidth(dayWrap);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [printing, setPrinting] = useState(false); // true only while the Plan tab is being printed
+  const [printRow, setPrintRow] = useState(null); // row height used only while the Plan tab is being printed
 
   const load = useCallback(async () => {
     try {
@@ -384,18 +386,25 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
     }
   }
 
-  // Print the Plan tab on one landscape page. For printing the rows switch to the short height, then the
-  // whole grid is scaled down to fit the page's width and height, and the browser's print window opens.
+  // Print the Plan tab on one landscape page. The grid is tall (8 AM to 9 PM), so fitting it by shrinking
+  // everything would waste the sheet's width. Instead the rows are made just short enough for the grid to
+  // fill the page's width at full text size (scaling down only if the grid is wider than the page).
   function printPlan() {
-    flushSync(() => setPrinting(true));
+    flushSync(() => setPrintRow(30));
     const el = document.querySelector('.print-fit');
     if (el) {
-      const z = Math.min(1, 970 / el.scrollWidth, 650 / el.scrollHeight);
+      const col = el.querySelector('.cal-col');
+      const slots = col ? Math.max(1, Math.round(col.offsetHeight / 30)) : 26;
+      const fixed = el.scrollHeight - slots * 30; // day headers, long-task bars, spacing
+      const zw = Math.min(1, PRINT_W / el.scrollWidth);
+      const rowH = Math.max(16, Math.min(30, Math.floor((PRINT_H / zw - fixed) / slots)));
+      flushSync(() => setPrintRow(rowH));
+      const z = Math.min(1, PRINT_W / el.scrollWidth, PRINT_H / el.scrollHeight);
       document.documentElement.style.setProperty('--print-zoom', String(z));
     }
     const done = () => {
       window.removeEventListener('afterprint', done);
-      setPrinting(false);
+      setPrintRow(null);
     };
     window.addEventListener('afterprint', done);
     window.print();
@@ -489,7 +498,7 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
   );
 
   // On a phone the Day view is squeezed to the screen and uses taller rows so blocks stay readable.
-  const dayRowH = printing ? ROW_HEIGHTS.compact : narrow ? Math.max(ROW_HEIGHTS[rows], ROW_HEIGHTS.large) : ROW_HEIGHTS[rows];
+  const dayRowH = printRow || (narrow ? Math.max(ROW_HEIGHTS[rows], ROW_HEIGHTS.large) : ROW_HEIGHTS[rows]);
   const fitWidth = narrow && dayWrapWidth ? Math.max(200, dayWrapWidth - PHONE_GUTTER) : null;
 
   const calendarProps = detail && {
@@ -500,7 +509,7 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
     labelOf,
     textOf,
     dishById,
-    rowH: printing ? ROW_HEIGHTS.compact : ROW_HEIGHTS[rows],
+    rowH: printRow || ROW_HEIGHTS[rows],
     canEdit,
     conflictIds,
     onOpenDish: openDish,
