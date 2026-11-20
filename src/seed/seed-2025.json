@@ -18,7 +18,7 @@
     { "id": "salad", "meal": "thu", "title": "Salad", "cook": "Lauren" },
     { "id": "cranberry", "meal": "thu", "title": "Cranberry Sauce", "cook": "Lauren" },
     { "id": "lasagna", "meal": "thu", "title": "Butternut Squash Lasagna", "cook": "Baker" },
-    { "id": "turkey-sat", "meal": "sat", "title": "Turkey (smoker)", "cook": "Spencer" },
+    { "id": "turkey-sat", "meal": "sat", "title": "Turkey (smoker)", "cook": "Other family" },
     { "id": "greenbeans", "meal": "sat", "title": "Green Beans", "cook": "Spencer" },
     { "id": "stock", "meal": "sat", "title": "Turkey Stock", "cook": "Spencer" },
     { "id": "gratin", "meal": "sat", "title": "Hasselback Gratin", "cook": "Spencer" },
@@ -45,7 +45,6 @@
 
     { "dish": "stock", "text": "Turkey stock (Thursday evening, after dinner; listed under Saturday on the sheet)", "startAt": "2025-11-27T17:00", "durationMin": 180, "resource": "stovetop", "anchor": "fixed" },
 
-    { "dish": "turkey-sat", "text": "Turkey out, dry", "startAt": "2025-11-28T11:30", "durationMin": 30, "resource": "hands", "anchor": "fixed" },
     { "dish": "turkey-sat", "text": "Turkey on smoker", "startAt": "2025-11-29T10:30", "durationMin": 270, "resource": "smoker", "anchor": "fixed" },
 
     { "dish": "wellington", "text": "Mushroom Wellington prep", "startAt": "2025-11-28T12:30", "durationMin": 60, "resource": "hands", "anchor": "fixed" },

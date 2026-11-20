@@ -27,10 +27,16 @@ describe('seed shifting', () => {
     expect(s.meals.find((m) => m.id === 'sat').serveAt).toBe('2026-11-28T15:00');
   });
 
-  it('keeps all content: 2 meals, 12 dishes, 21 steps + shopping', () => {
+  it('keeps all content: 2 meals, 12 dishes, 20 steps + shopping', () => {
     expect(s.meals).toHaveLength(2);
     expect(s.dishes).toHaveLength(12);
-    expect(s.steps).toHaveLength(22);
+    expect(s.steps).toHaveLength(21);
+  });
+
+  it('smoked turkey belongs to the other family and has no "out, dry" step', () => {
+    expect(s.dishes.find((d) => d.id === 'turkey-sat').cookName).toBe('Other family');
+    const smokerSteps = s.steps.filter((x) => x.dishId === 'turkey-sat');
+    expect(smokerSteps.map((x) => x.text)).toEqual(['Turkey on smoker']);
   });
 
   it('puts the shopping trip on Tuesday 4 PM', () => {
