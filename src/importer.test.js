@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { toEventDocs, validateImport } from './importer.js';
-import { fmtDuration, fmtRange, shortLabel, stepKind, stepLabel } from './labels.js';
+import { blockText, fmtDuration, fmtRange, laneOf, stepKind, stepLabel } from './labels.js';
 
 const menu = () => ({
   event: { name: 'Thanksgiving 2026', year: 2026, startDate: '2026-11-23', endDate: '2026-11-28' },
@@ -84,14 +84,27 @@ describe('labels', () => {
     expect(stepLabel({ dishId: 'a', kind: 'cook', text: 'Roast' }, { emoji: '🦃' })).toBe('🦃 🔥 Roast');
     expect(stepLabel({ dishId: '', text: 'Shopping' }, undefined)).toBe('🛒 Shopping');
   });
-  it('builds short grid labels: Prep, Cook with the appliance, Rest', () => {
-    const dish = { emoji: '🦃' };
-    expect(shortLabel({ dishId: 'a', kind: 'prep', text: 'Pan, truss, preheat', resource: 'hands' }, dish)).toBe('🦃 🔪 Prep');
-    expect(shortLabel({ dishId: 'a', kind: 'cook', text: 'Roast', resource: 'oven' }, dish)).toBe('🦃 🔥 Cook · Oven');
-    expect(shortLabel({ dishId: 'a', kind: 'cook', text: 'Gravy', resource: 'stovetop' }, dish)).toBe('🦃 🔥 Cook · Stovetop');
-    expect(shortLabel({ dishId: 'a', kind: 'cook', text: 'Finish', resource: 'hands' }, dish)).toBe('🦃 🔥 Cook');
-    expect(shortLabel({ dishId: 'a', kind: 'rest', text: 'Rest', resource: 'none' }, dish)).toBe('🦃 ⏲️ Rest');
-    expect(shortLabel({ dishId: '', kind: 'event', text: 'Shopping' }, undefined)).toBe('🛒 Shopping');
+  it('builds two-line grid text: kind and appliance, then the dish name', () => {
+    const dish = { emoji: '🦃', title: 'Turkey with Gravy' };
+    const t = (step) => blockText(step, dish);
+    expect(t({ dishId: 'a', kind: 'prep', text: 'Pan, truss', resource: 'hands' })).toMatchObject({ line1: '🦃 🔪 Prep', line2: 'Turkey with Gravy' });
+    expect(t({ dishId: 'a', kind: 'assemble', text: 'Assemble pie', resource: 'hands' }).line1).toBe('🦃 🧩 Assemble');
+    expect(t({ dishId: 'a', kind: 'cook', text: 'Roast', resource: 'oven' }).line1).toBe('🦃 🔥 Cook · Oven');
+    expect(t({ dishId: 'a', kind: 'cook', text: 'Gravy', resource: 'stovetop' }).line1).toBe('🦃 🔥 Cook · Stovetop');
+    expect(t({ dishId: 'a', kind: 'cook', text: 'Finish', resource: 'hands' }).line1).toBe('🦃 🔥 Cook');
+    expect(t({ dishId: 'a', kind: 'rest', text: 'Rest', resource: 'none' }).line1).toBe('🦃 ⏲️ Rest');
+    expect(blockText({ dishId: '', kind: 'event', text: 'Shopping' }, undefined)).toMatchObject({ line1: '🛒 Shopping', line2: '' });
+    expect(t({ dishId: 'a', kind: 'cook', text: 'Roast', resource: 'oven' }).full).toBe('🦃 🔥 Roast');
+  });
+  it('puts steps in the Prep & Assemble, Stovetop or Oven lane', () => {
+    expect(laneOf({ dishId: 'a', kind: 'prep', resource: 'hands' })).toBe('prep');
+    expect(laneOf({ dishId: 'a', kind: 'assemble', resource: 'hands' })).toBe('prep');
+    expect(laneOf({ dishId: 'a', kind: 'rest', resource: 'none' })).toBe('prep');
+    expect(laneOf({ dishId: '', kind: 'event' })).toBe('prep');
+    expect(laneOf({ dishId: 'a', kind: 'cook', resource: 'oven' })).toBe('oven');
+    expect(laneOf({ dishId: 'a', kind: 'cook', resource: 'stovetop' })).toBe('stove');
+    expect(laneOf({ dishId: 'a', kind: 'cook', resource: 'smoker' })).toBe('stove');
+    expect(laneOf({ dishId: 'a', kind: 'cook', resource: 'hands' })).toBe('prep');
   });
   it('formats durations and ranges', () => {
     expect(fmtDuration(40)).toBe('40 min');

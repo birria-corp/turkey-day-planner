@@ -59,6 +59,43 @@ export function layoutLanes(blocks) {
   return out;
 }
 
+export const LANE_ORDER = ['prep', 'stove', 'oven'];
+export const LANE_LABEL = { prep: 'Prep & Assemble', stove: 'Stovetop', oven: 'Oven' };
+
+/**
+ * Lay out one day's blocks (each needs `laneKey`: prep | stove | oven).
+ * Quiet days use plain side-by-side clusters. When more than `threshold` blocks would sit side
+ * by side, the day switches to fixed lanes (Prep & Assemble | Stovetop | Oven) and each lane is
+ * only as wide as its own overlap needs. Every block gets `col` and `span` in width units;
+ * the day is `units` wide.
+ * @returns {{ mode: 'plain'|'lanes', units: number, lanes: {key,label,start,units}[], blocks: object[] }}
+ */
+export function layoutDay(blocks, threshold = 3) {
+  const plain = layoutLanes(blocks);
+  const widest = Math.max(1, ...plain.map((b) => b.lanes));
+  if (widest <= threshold) {
+    return {
+      mode: 'plain',
+      units: widest,
+      lanes: [],
+      blocks: plain.map((b) => ({ ...b, col: b.lane * (widest / b.lanes), span: widest / b.lanes })),
+    };
+  }
+
+  const out = [];
+  const lanes = [];
+  let start = 0;
+  for (const key of LANE_ORDER) {
+    const inLane = layoutLanes(blocks.filter((b) => b.laneKey === key));
+    if (!inLane.length) continue;
+    const units = Math.max(1, ...inLane.map((b) => b.lanes));
+    lanes.push({ key, label: LANE_LABEL[key], start, units });
+    inLane.forEach((b) => out.push({ ...b, col: start + b.lane * (units / b.lanes), span: units / b.lanes }));
+    start += units;
+  }
+  return { mode: 'lanes', units: start, lanes, blocks: out };
+}
+
 /** Minutes since midnight -> "1:30 PM". */
 export function slotLabel(min) {
   const h = Math.floor(min / 60);

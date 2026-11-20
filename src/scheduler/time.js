@@ -23,6 +23,16 @@ export function addMinutes(stamp, minutes) {
   return toStamp(d);
 }
 
+/** Day key + minutes since midnight -> stamp. ("2026-11-26", 810) -> "2026-11-26T13:30". */
+export function stampAt(key, minutes) {
+  return `${key}T${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`;
+}
+
+/** Minutes from stamp a to stamp b (negative when b is earlier). */
+export function diffMinutes(a, b) {
+  return Math.round((parseStamp(b) - parseStamp(a)) / 60000);
+}
+
 /** "2026-11-26T13:00" -> "1:00 PM". */
 export function fmtTime(stamp) {
   const d = parseStamp(stamp);

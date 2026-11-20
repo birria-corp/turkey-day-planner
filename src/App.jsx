@@ -7,7 +7,7 @@ import EventView from './EventView.jsx';
 
 // Same uid pinned in firestore.rules. A uid is not a secret; rules enforce access.
 const OWNER_UID = 'enVCX2fxmbMOHfPSOHcWBdvtgZi1';
-const VERSION = 'v0.6.1';
+const VERSION = 'v0.7.0';
 
 const fmt = (d) =>
   d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });

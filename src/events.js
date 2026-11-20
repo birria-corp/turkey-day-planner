@@ -1,5 +1,7 @@
 import {
+  addDoc,
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -91,6 +93,21 @@ export async function importEvent(data, ownerUid) {
 /** Assign a cook to a dish. Allowed for cooks and owner by the rules. */
 export function updateDishCook(id, dishId, cookName) {
   return updateDoc(doc(db, 'events', id, 'dishes', dishId), { cookName });
+}
+
+/** Change one step (start time, length, description, resource). Cooks and owner only, by the rules. */
+export function updateStep(id, stepId, patch) {
+  return updateDoc(doc(db, 'events', id, 'steps', stepId), patch);
+}
+
+/** Add a step. Returns its new id. */
+export async function addStep(id, step) {
+  const ref = await addDoc(collection(db, 'events', id, 'steps'), step);
+  return ref.id;
+}
+
+export function deleteStep(id, stepId) {
+  return deleteDoc(doc(db, 'events', id, 'steps', stepId));
 }
 
 /** Change how many times a recipe is multiplied. Rebuild the shopping list afterwards. */

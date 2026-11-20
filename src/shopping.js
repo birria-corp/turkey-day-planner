@@ -10,6 +10,55 @@ export const AISLE_ORDER = [
   'Produce', 'Meat', 'Dairy', 'Frozen', 'Canned', 'Pantry', 'Baking', 'Spices', 'Wine', 'Specialty', 'Equipment', 'Other',
 ];
 
+// Like items sit next to each other inside an aisle: Produce is split into fruit, herbs,
+// greens and so on. A recipe can set `group` on an ingredient; otherwise it is guessed from the name.
+export const GROUP_ORDER = {
+  Produce: ['Fruit & citrus', 'Herbs', 'Leafy greens', 'Roots & alliums', 'Other vegetables'],
+  Dairy: ['Milk & cream', 'Yogurt', 'Cheese', 'Eggs & butter'],
+  Pantry: ['Oils & vinegars', 'Stocks & broths', 'Sweeteners & syrups', 'Condiments & sauces', 'Nuts & crunchy', 'Other pantry'],
+  Baking: ['Flour & meal', 'Sugar', 'Leaveners'],
+  Spices: ['Salt & pepper', 'Spices & dried herbs'],
+};
+
+const GROUP_RULES = [
+  ['Produce', 'Herbs', /\b(thyme|rosemary|mint|cilantro|parsley|basil|chives|dill|sage)\b/i],
+  ['Produce', 'Fruit & citrus', /\b(apples?|lemons?|oranges?|limes?|cranberr\w*|pears?)\b/i],
+  ['Produce', 'Leafy greens', /\b(spinach|lettuce|kale|arugula|chard|greens)\b/i],
+  ['Produce', 'Roots & alliums', /\b(potato|potatoes|carrots?|onions?|shallots?|garlic|ginger|leeks?|beets?|turnips?|parsnips?)\b/i],
+  ['Dairy', 'Yogurt', /yogurt|buttermilk/i],
+  ['Dairy', 'Cheese', /cheese|paneer|pecorino|parmigiano|gruyere|comte|cheddar/i],
+  ['Dairy', 'Eggs & butter', /\b(eggs?|butter)\b/i],
+  ['Dairy', 'Milk & cream', /\b(milk|cream)\b/i],
+  ['Pantry', 'Oils & vinegars', /\b(oil|vinegar|soy sauce)\b/i],
+  ['Pantry', 'Stocks & broths', /\b(stock|broth)\b/i],
+  ['Pantry', 'Sweeteners & syrups', /\b(honey|maple|syrup)\b/i],
+  ['Pantry', 'Condiments & sauces', /\b(mustard|paste|ketchup|sauce)\b/i],
+  ['Pantry', 'Nuts & crunchy', /\b(almonds?|nuts?|crispy)\b/i],
+  ['Baking', 'Flour & meal', /\b(flour|cornmeal|meal)\b/i],
+  ['Baking', 'Sugar', /\bsugar\b/i],
+  ['Baking', 'Leaveners', /baking (powder|soda)/i],
+  ['Spices', 'Salt & pepper', /\b(salt|pepper)\b/i],
+];
+
+const GROUP_DEFAULT = {
+  Produce: 'Other vegetables',
+  Pantry: 'Other pantry',
+  Spices: 'Spices & dried herbs',
+};
+
+/** Sub-group for an item within its aisle ('' when the aisle has none). */
+export function inferGroup(aisle, name) {
+  const hit = GROUP_RULES.find(([a, , re]) => a === aisle && re.test(name));
+  return hit ? hit[1] : GROUP_DEFAULT[aisle] || '';
+}
+
+export const groupOf = (item) => item.group || inferGroup(item.aisle, item.name);
+
+const groupRank = (aisle, group) => {
+  const i = (GROUP_ORDER[aisle] || []).indexOf(group);
+  return i === -1 ? 99 : i;
+};
+
 const PLURAL = {
   clove: 'cloves', stalk: 'stalks', sprig: 'sprigs', can: 'cans', box: 'boxes', head: 'heads',
   bunch: 'bunches', handful: 'handfuls', sheet: 'sheets', bag: 'bags', jar: 'jars', bottle: 'bottles', inch: 'inches',
@@ -115,14 +164,29 @@ export function buildShoppingList(dishes) {
         qtyText = `${fmtQty(sticks)} ${sticks > 1 ? 'sticks' : 'stick'} (${fmtQty(qty / 3)} tbsp)`;
       }
     }
-    return { id: i.id, name: i.name, aisle: i.aisle, family: i.family, qty, qtyText, dishes: i.dishes, note: i.notes.join('; ') };
+    return {
+      id: i.id,
+      name: i.name,
+      aisle: i.aisle,
+      group: inferGroup(i.aisle, i.name),
+      family: i.family,
+      qty,
+      qtyText,
+      dishes: i.dishes,
+      note: i.notes.join('; '),
+    };
   });
 
   const rank = (a) => {
     const r = AISLE_ORDER.indexOf(a);
     return r === -1 ? AISLE_ORDER.length : r;
   };
-  return items.sort((a, b) => rank(a.aisle) - rank(b.aisle) || a.name.localeCompare(b.name));
+  return items.sort(
+    (a, b) =>
+      rank(a.aisle) - rank(b.aisle) ||
+      groupRank(a.aisle, a.group) - groupRank(b.aisle, b.group) ||
+      a.name.localeCompare(b.name),
+  );
 }
 
 function toBase(qty, unit) {
@@ -131,16 +195,26 @@ function toBase(qty, unit) {
   return qty;
 }
 
-/** [[aisle, items[]], ...] in store order. */
+/** [[aisle, [[group, items[]], ...]], ...] in store order, like items together. */
 export function groupByAisle(items) {
-  const groups = new Map();
+  const aisles = new Map();
   for (const i of items) {
-    if (!groups.has(i.aisle)) groups.set(i.aisle, []);
-    groups.get(i.aisle).push(i);
+    if (!aisles.has(i.aisle)) aisles.set(i.aisle, new Map());
+    const groups = aisles.get(i.aisle);
+    const g = groupOf(i);
+    if (!groups.has(g)) groups.set(g, []);
+    groups.get(g).push(i);
   }
   const rank = (a) => {
     const r = AISLE_ORDER.indexOf(a);
     return r === -1 ? AISLE_ORDER.length : r;
   };
-  return [...groups.entries()].sort((a, b) => rank(a[0]) - rank(b[0]));
+  return [...aisles.entries()]
+    .sort((a, b) => rank(a[0]) - rank(b[0]))
+    .map(([aisle, groups]) => [
+      aisle,
+      [...groups.entries()]
+        .sort((a, b) => groupRank(aisle, a[0]) - groupRank(aisle, b[0]))
+        .map(([g, list]) => [g, [...list].sort((a, b) => a.name.localeCompare(b.name))]),
+    ]);
 }

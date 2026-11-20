@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildShoppingList, fmtQty, fmtVolume, fmtWeight, groupByAisle, scaleQty } from './shopping.js';
+import { buildShoppingList, fmtQty, fmtVolume, fmtWeight, groupByAisle, inferGroup, scaleQty } from './shopping.js';
 
 describe('quantity formatting', () => {
   it('formats fractions to the nearest eighth', () => {
@@ -94,6 +94,43 @@ describe('buildShoppingList', () => {
 
   it('sorts into store order: Produce, Dairy, Spices, Equipment', () => {
     expect(groupByAisle(list).map(([a]) => a)).toEqual(['Produce', 'Dairy', 'Spices', 'Equipment']);
+  });
+
+  it('puts like items next to each other inside an aisle', () => {
+    const l = buildShoppingList([
+      {
+        title: 'X',
+        ingredients: [
+          { name: 'Yellow onion', qty: 1, unit: '', aisle: 'Produce' },
+          { name: 'Fresh mint', qty: 1, unit: 'handful', aisle: 'Produce' },
+          { name: 'Brussels sprouts', qty: 1, unit: 'lb', aisle: 'Produce' },
+          { name: 'Granny Smith apple', qty: 1, unit: '', aisle: 'Produce' },
+          { name: 'Apples', qty: 2, unit: '', aisle: 'Produce' },
+          { name: 'Baby spinach', qty: 5, unit: 'oz', aisle: 'Produce' },
+          { name: 'Lemon', qty: 1, unit: '', aisle: 'Produce' },
+          { name: 'Pecorino', qty: 3, unit: 'oz', aisle: 'Dairy' },
+          { name: 'Heavy cream', qty: 1, unit: 'cup', aisle: 'Dairy' },
+          { name: 'Eggs', qty: 4, unit: '', aisle: 'Dairy' },
+          { name: 'Greek yogurt', qty: 2, unit: 'tbsp', aisle: 'Dairy' },
+        ],
+      },
+    ]);
+    const produce = groupByAisle(l).find(([a]) => a === 'Produce')[1];
+    expect(produce.map(([g]) => g)).toEqual(['Fruit & citrus', 'Herbs', 'Leafy greens', 'Roots & alliums', 'Other vegetables']);
+    expect(produce[0][1].map((i) => i.name)).toEqual(['Apples', 'Granny Smith apple', 'Lemon']);
+    const dairy = groupByAisle(l).find(([a]) => a === 'Dairy')[1];
+    expect(dairy.map(([g]) => g)).toEqual(['Milk & cream', 'Yogurt', 'Cheese', 'Eggs & butter']);
+  });
+
+  it('guesses sub-groups for pantry, baking and spices', () => {
+    expect(inferGroup('Pantry', 'Extra virgin olive oil')).toBe('Oils & vinegars');
+    expect(inferGroup('Pantry', 'Chicken broth')).toBe('Stocks & broths');
+    expect(inferGroup('Pantry', 'Whole-grain mustard')).toBe('Condiments & sauces');
+    expect(inferGroup('Baking', 'All-purpose flour')).toBe('Flour & meal');
+    expect(inferGroup('Baking', 'Baking soda')).toBe('Leaveners');
+    expect(inferGroup('Spices', 'Black pepper')).toBe('Salt & pepper');
+    expect(inferGroup('Spices', 'Garam masala')).toBe('Spices & dried herbs');
+    expect(inferGroup('Meat', 'Frozen turkey')).toBe('');
   });
 
   it('gives each line a stable id', () => {

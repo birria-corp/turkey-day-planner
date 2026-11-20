@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  addStep,
   deleteEvent,
+  deleteStep,
   eventId,
   fetchEventDetail,
   fetchEvents,
@@ -8,18 +10,25 @@ import {
   loadSampleEvent,
   updateDishCook,
   updateDishScale,
+  updateStep,
 } from './events.js';
 import BlockCalendar from './BlockCalendar.jsx';
+import DayAgenda from './DayAgenda.jsx';
 import DinnerPanel from './DinnerPanel.jsx';
 import MenuView from './MenuView.jsx';
 import ShoppingView from './ShoppingView.jsx';
 import { EVENT_COLOR, dishColor, sortDishes } from './palette.js';
-import { KIND_MARKER, shortLabel, stepLabel } from './labels.js';
+import { KIND_MARKER, KIND_NAME, blockText, stepLabel } from './labels.js';
+import { daysInRange } from './scheduler/dates.js';
+import { findConflicts } from './scheduler/conflicts.js';
 import { addMinutes, dayKey, fmtDayHeading, fmtTime } from './scheduler/time.js';
 
 const SAMPLE_YEAR = 2026;
 const VIEW_KEY = 'tdp-view';
 const TAB_KEY = 'tdp-tab';
+const ROWS_KEY = 'tdp-rows';
+const ROW_HEIGHTS = { compact: 30, normal: 48, large: 64 };
+const RESOURCE_WORD = { oven: 'Oven', stovetop: 'Stovetop', smoker: 'Smoker' };
 
 function readStored(key, allowed, fallback) {
   try {
@@ -37,6 +46,14 @@ function store(key, value) {
     /* storage blocked: the choice still works for this visit */
   }
 }
+
+const parseKey = (key) => {
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(y, m - 1, d);
+};
+
+const shortDay = (key) =>
+  parseKey(key).toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
 
 /** Day-by-day list of an event's steps and serve times, with dish colors. */
 function Timeline({ meals, dishes, steps, colorOf }) {
@@ -99,7 +116,10 @@ export default function EventView({ isOwner, canEdit, ownerUid }) {
   const [events, setEvents] = useState(undefined); // undefined = loading
   const [detail, setDetail] = useState(null);
   const [tab, setTab] = useState(() => readStored(TAB_KEY, ['plan', 'menu', 'shopping'], 'plan'));
-  const [view, setView] = useState(() => readStored(VIEW_KEY, ['grid', 'timeline'], 'grid'));
+  const [view, setView] = useState(() => readStored(VIEW_KEY, ['week', 'day', 'timeline'], 'week'));
+  const [rows, setRows] = useState(() => readStored(ROWS_KEY, Object.keys(ROW_HEIGHTS), 'normal'));
+  const [day, setDay] = useState(null);
+  const [menuOpenId, setMenuOpenId] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -133,11 +153,38 @@ export default function EventView({ isOwner, canEdit, ownerUid }) {
     [detail],
   );
   const labelOf = useCallback((step) => stepLabel(step, dishById[step.dishId]), [dishById]);
-  const shortOf = useCallback((step) => shortLabel(step, dishById[step.dishId]), [dishById]);
+  const textOf = useCallback((step) => blockText(step, dishById[step.dishId]), [dishById]);
+
+  // Every day with something on it, for the Day view picker.
+  const allDays = useMemo(() => {
+    if (!current || !detail) return [];
+    const keys = new Set(daysInRange(parseKey(current.startDate), parseKey(current.endDate)).map((d) => d.iso));
+    detail.steps.forEach((s) => keys.add(dayKey(s.startAt)));
+    detail.meals.forEach((m) => keys.add(dayKey(m.serveAt)));
+    return [...keys].sort();
+  }, [current, detail]);
+
+  const activeDay = useMemo(() => {
+    if (day && allDays.includes(day)) return day;
+    const today = new Date();
+    const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    if (allDays.includes(todayKey)) return todayKey;
+    const serve = detail && detail.meals.length ? detail.meals.map((m) => m.serveAt).sort()[0] : null;
+    return serve ? dayKey(serve) : allDays[0];
+  }, [day, allDays, detail]);
+
+  const conflicts = useMemo(() => (detail ? findConflicts(detail.steps) : []), [detail]);
+  const conflictIds = useMemo(() => new Set(conflicts.flatMap((c) => c.stepIds)), [conflicts]);
 
   function pick(setter, key, value) {
     setter(value);
     store(key, value);
+  }
+
+  function openDish(id) {
+    setMenuOpenId(id);
+    pick(setTab, TAB_KEY, 'menu');
+    window.scrollTo({ top: 0 });
   }
 
   async function run(fn) {
@@ -172,6 +219,51 @@ export default function EventView({ isOwner, canEdit, ownerUid }) {
         ...d,
         dishes: d.dishes.map((x) => (x.id === dishId ? { ...x, scale } : x)),
       }));
+      setError('');
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  // Step edits show at once, then save; if the save fails the page reloads the saved plan.
+  async function patchStep(stepId, patch) {
+    setDetail((d) => ({ ...d, steps: d.steps.map((s) => (s.id === stepId ? { ...s, ...patch } : s)) }));
+    try {
+      await updateStep(current.id, stepId, patch);
+      setError('');
+    } catch (e) {
+      setError(e.message);
+      load();
+    }
+  }
+
+  async function createStep(dish, kind) {
+    const mine = detail.steps.filter((s) => s.dishId === dish.id);
+    const meal = detail.meals.find((m) => m.id === dish.mealId);
+    const lastEnd = mine.map((s) => addMinutes(s.startAt, s.durationMin)).sort().pop();
+    const step = {
+      dishId: dish.id,
+      kind,
+      text: KIND_NAME[kind],
+      startAt: lastEnd || (meal ? addMinutes(meal.serveAt, -60) : `${activeDay}T12:00`),
+      durationMin: 30,
+      resource: kind === 'cook' ? 'oven' : 'hands',
+      anchor: 'fixed',
+    };
+    try {
+      const id = await addStep(current.id, step);
+      setDetail((d) => ({ ...d, steps: [...d.steps, { id, ...step }] }));
+      setError('');
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  async function removeStep(step) {
+    if (!window.confirm(`Remove "${step.text}"?`)) return;
+    try {
+      await deleteStep(current.id, step.id);
+      setDetail((d) => ({ ...d, steps: d.steps.filter((s) => s.id !== step.id) }));
       setError('');
     } catch (e) {
       setError(e.message);
@@ -218,6 +310,33 @@ export default function EventView({ isOwner, canEdit, ownerUid }) {
       {label}
     </button>
   );
+  const viewBtn = (id, label) => (
+    <button className={`tab ${view === id ? 'active' : 'secondary'}`} onClick={() => pick(setView, VIEW_KEY, id)}>
+      {label}
+    </button>
+  );
+  const rowBtn = (id, label) => (
+    <button className={`tab ${rows === id ? 'active' : 'secondary'}`} onClick={() => pick(setRows, ROWS_KEY, id)}>
+      {label}
+    </button>
+  );
+
+  const calendarProps = detail && {
+    event: current,
+    meals: detail.meals,
+    steps: detail.steps,
+    colorOf,
+    labelOf,
+    textOf,
+    dishById,
+    rowH: ROW_HEIGHTS[rows],
+    canEdit,
+    conflictIds,
+    onOpenDish: openDish,
+    onMoveStep: (stepId, startAt) => patchStep(stepId, { startAt }),
+  };
+
+  const dayIndex = allDays.indexOf(activeDay);
 
   return (
     <section>
@@ -239,47 +358,111 @@ export default function EventView({ isOwner, canEdit, ownerUid }) {
 
           {tab === 'plan' && (
             <>
-              <p>
-                <button
-                  className={`tab ${view === 'grid' ? 'active' : 'secondary'}`}
-                  onClick={() => pick(setView, VIEW_KEY, 'grid')}
-                >
-                  Grid
-                </button>
-                <button
-                  className={`tab ${view === 'timeline' ? 'active' : 'secondary'}`}
-                  onClick={() => pick(setView, VIEW_KEY, 'timeline')}
-                >
-                  Timeline
-                </button>
+              <p className="toolbar">
+                <span>
+                  {viewBtn('week', 'Week')}
+                  {viewBtn('day', 'Day')}
+                  {viewBtn('timeline', 'Timeline')}
+                </span>
+                {view !== 'timeline' && (
+                  <span className="rowpick">
+                    <span className="muted">Row height</span> {rowBtn('compact', 'S')}
+                    {rowBtn('normal', 'M')}
+                    {rowBtn('large', 'L')}
+                  </span>
+                )}
                 <span className="muted legend">
-                  {KIND_MARKER.prep} prep &nbsp; {KIND_MARKER.cook} cook &nbsp; {KIND_MARKER.rest} rest &nbsp; {KIND_MARKER.event} errand
+                  {KIND_MARKER.prep} prep &nbsp; {KIND_MARKER.assemble} assemble &nbsp; {KIND_MARKER.cook} cook &nbsp;{' '}
+                  {KIND_MARKER.rest} rest &nbsp; {KIND_MARKER.event} errand
                 </span>
               </p>
-              {detail &&
-                (view === 'grid' ? (
+
+              {conflicts.length > 0 && view !== 'timeline' && (
+                <div className="conflicts" role="status">
+                  <strong>⚠ Equipment over capacity</strong>
+                  {conflicts.map((c) => (
+                    <div key={`${c.resource}-${c.from}`}>
+                      {RESOURCE_WORD[c.resource]} has {c.count} things at once (holds {c.capacity}),{' '}
+                      {shortDay(dayKey(c.from))} {fmtTime(c.from)} – {fmtTime(c.to)}:{' '}
+                      {c.stepIds
+                        .map((id) => detail.steps.find((s) => s.id === id))
+                        .filter(Boolean)
+                        .map((s) => labelOf(s))
+                        .join(', ')}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {detail && view === 'week' && (
+                <div className="cal-wrap">
+                  <BlockCalendar
+                    {...calendarProps}
+                    side={
+                      <DinnerPanel
+                        meals={detail.meals}
+                        dishes={detail.dishes}
+                        colorOf={colorOf}
+                        canEdit={canEdit}
+                        onCookChange={changeCook}
+                      />
+                    }
+                  />
+                </div>
+              )}
+
+              {detail && view === 'day' && activeDay && (
+                <>
+                  <p className="daypick">
+                    <button
+                      className="secondary"
+                      disabled={dayIndex <= 0}
+                      onClick={() => setDay(allDays[dayIndex - 1])}
+                      aria-label="Previous day"
+                    >
+                      ←
+                    </button>
+                    {allDays.map((k) => (
+                      <button
+                        key={k}
+                        className={`tab ${k === activeDay ? 'active' : 'secondary'}`}
+                        onClick={() => setDay(k)}
+                      >
+                        {shortDay(k)}
+                      </button>
+                    ))}
+                    <button
+                      className="secondary"
+                      disabled={dayIndex >= allDays.length - 1}
+                      onClick={() => setDay(allDays[dayIndex + 1])}
+                      aria-label="Next day"
+                    >
+                      →
+                    </button>
+                  </p>
                   <div className="cal-wrap">
                     <BlockCalendar
-                      event={current}
-                      meals={detail.meals}
-                      steps={detail.steps}
-                      colorOf={colorOf}
-                      labelOf={labelOf}
-                      shortOf={shortOf}
+                      {...calendarProps}
+                      onlyDay={activeDay}
+                      unitW={150}
                       side={
-                        <DinnerPanel
-                          meals={detail.meals}
+                        <DayAgenda
+                          day={activeDay}
+                          steps={detail.steps}
                           dishes={detail.dishes}
+                          meals={detail.meals}
                           colorOf={colorOf}
-                          canEdit={canEdit}
-                          onCookChange={changeCook}
+                          onOpenDish={openDish}
                         />
                       }
                     />
                   </div>
-                ) : (
-                  <Timeline meals={detail.meals} dishes={detail.dishes} steps={detail.steps} colorOf={colorOf} />
-                ))}
+                </>
+              )}
+
+              {detail && view === 'timeline' && (
+                <Timeline meals={detail.meals} dishes={detail.dishes} steps={detail.steps} colorOf={colorOf} />
+              )}
             </>
           )}
 
@@ -290,7 +473,12 @@ export default function EventView({ isOwner, canEdit, ownerUid }) {
               steps={detail.steps}
               colorOf={colorOf}
               canEdit={canEdit}
+              openId={menuOpenId}
+              onOpenChange={setMenuOpenId}
               onScaleChange={changeScale}
+              onUpdateStep={patchStep}
+              onAddStep={createStep}
+              onDeleteStep={removeStep}
             />
           )}
 

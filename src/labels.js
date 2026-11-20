@@ -1,10 +1,13 @@
 // Block labels: dish emoji + a marker for the kind of work, then the description.
 import { addMinutes, dayKey, fmtTime, parseStamp } from './scheduler/time.js';
 
-export const KIND_MARKER = { prep: '🔪', cook: '🔥', rest: '⏲️', event: '🛒' };
-export const KIND_NAME = { prep: 'Prep', cook: 'Cook', rest: 'Rest', event: 'Errand' };
+export const KIND_MARKER = { prep: '🔪', assemble: '🧩', cook: '🔥', rest: '⏲️', event: '🛒' };
+export const KIND_NAME = { prep: 'Prep', assemble: 'Assemble', cook: 'Cook', rest: 'Rest', event: 'Errand' };
+export const RESOURCE_NAME = {
+  oven: 'Oven', stovetop: 'Stovetop', smoker: 'Smoker', fridge: 'Fridge', hands: 'By hand', none: 'None',
+};
 
-/** prep | cook | rest | event. Older steps without a kind are guessed from their resource. */
+/** prep | assemble | cook | rest | event. Older steps without a kind are guessed from their resource. */
 export function stepKind(step) {
   if (step.kind) return step.kind;
   if (!step.dishId) return 'event';
@@ -13,23 +16,37 @@ export function stepKind(step) {
   return 'cook';
 }
 
+/** Which column a step sits in on a busy day: prep (also assemble, rest, errands), stove, or oven. */
+export function laneOf(step) {
+  const kind = stepKind(step);
+  if (kind !== 'cook') return 'prep';
+  if (step.resource === 'oven') return 'oven';
+  if (step.resource === 'stovetop' || step.resource === 'smoker') return 'stove';
+  return 'prep';
+}
+
 /** "🦃 🔥 Roast": dish emoji, kind marker, description. */
 export function stepLabel(step, dish) {
   return [dish && dish.emoji, KIND_MARKER[stepKind(step)], step.text].filter(Boolean).join(' ');
 }
 
-const RESOURCE_NAME = { oven: 'Oven', stovetop: 'Stovetop', smoker: 'Smoker', fridge: 'Fridge' };
+const APPLIANCE = { oven: 'Oven', stovetop: 'Stovetop', smoker: 'Smoker', fridge: 'Fridge' };
 
 /**
- * Short label for the grid: "🦃 🔪 Prep", "🥔 🔥 Cook · Stovetop", "⏲️ Rest". Errands keep their
- * text ("Shopping"). The full description shows on hover, in the Timeline and in the Menu tab.
+ * Text for a grid block. line1: "🦃 🔥 Cook · Oven". line2: the dish name ("Turkey with Gravy").
+ * Errands keep their own text. `full` is the whole description for hover text.
  */
-export function shortLabel(step, dish) {
+export function blockText(step, dish) {
   const kind = stepKind(step);
-  if (kind === 'event') return [KIND_MARKER.event, step.text].join(' ');
-  const resource = kind === 'cook' ? RESOURCE_NAME[step.resource] : '';
-  const word = resource ? `${KIND_NAME[kind]} · ${resource}` : KIND_NAME[kind];
-  return [dish && dish.emoji, KIND_MARKER[kind], word].filter(Boolean).join(' ');
+  const full = stepLabel(step, dish);
+  if (kind === 'event') return { line1: `${KIND_MARKER.event} ${step.text}`, line2: '', full };
+  const appliance = kind === 'cook' ? APPLIANCE[step.resource] : '';
+  const word = appliance ? `${KIND_NAME[kind]} · ${appliance}` : KIND_NAME[kind];
+  return {
+    line1: [dish && dish.emoji, KIND_MARKER[kind], word].filter(Boolean).join(' '),
+    line2: dish ? dish.title : '',
+    full,
+  };
 }
 
 /** 40 -> "40 min", 150 -> "2 hr 30 min", 1365 -> "22 hr 45 min". */

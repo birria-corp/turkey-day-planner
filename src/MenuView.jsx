@@ -1,9 +1,12 @@
-import React, { useMemo, useState } from 'react';
-import { KIND_MARKER, KIND_NAME, fmtDuration, fmtRange, stepKind } from './labels.js';
+import React, { useMemo } from 'react';
+import { KIND_MARKER, KIND_NAME, RESOURCE_NAME, fmtDuration, fmtRange, stepKind } from './labels.js';
 import { fmtQty, scaleQty } from './shopping.js';
 import { sortDishes } from './palette.js';
+import { addMinutes, diffMinutes } from './scheduler/time.js';
 
 const PLURAL = { clove: 'cloves', stalk: 'stalks', sprig: 'sprigs', can: 'cans', box: 'boxes', head: 'heads', bunch: 'bunches', handful: 'handfuls', inch: 'inches' };
+const STAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
+const RESOURCES = ['oven', 'stovetop', 'smoker', 'fridge', 'hands', 'none'];
 
 /** "1 1/2 tsp ground cumin" with the dish's scale applied. */
 function ingredientLine(ing, scale) {
@@ -17,8 +20,8 @@ function ingredientLine(ing, scale) {
 function blocksFor(dishId, steps) {
   const mine = steps.filter((s) => s.dishId === dishId).sort((a, b) => (a.startAt < b.startAt ? -1 : 1));
   return {
-    prep: mine.filter((s) => stepKind(s) === 'prep'),
-    cook: mine.filter((s) => stepKind(s) !== 'prep'),
+    prep: mine.filter((s) => ['prep', 'assemble'].includes(stepKind(s))),
+    cook: mine.filter((s) => !['prep', 'assemble'].includes(stepKind(s))),
     all: mine,
   };
 }
@@ -59,15 +62,105 @@ function Card({ dish, meal, steps, color, onOpen }) {
         {dish.scale && dish.scale !== 1 ? ` · x${dish.scale}` : ''}
       </div>
       {b.all.length === 0 && <div className="muted">No blocks scheduled</div>}
-      <BlockLines title="Prep" marker={KIND_MARKER.prep} list={b.prep} />
+      <BlockLines title="Prep & Assemble" marker={KIND_MARKER.prep} list={b.prep} />
       <BlockLines title="Cook" marker={KIND_MARKER.cook} list={b.cook} />
     </button>
   );
 }
 
-function Detail({ dish, meal, steps, color, canEdit, onScaleChange, onBack }) {
+/** One editable step: description, start, end and total time. Editing start moves it; editing end changes its length. */
+function StepRow({ step, canEdit, onUpdate, onDelete }) {
+  const kind = stepKind(step);
+  const end = addMinutes(step.startAt, step.durationMin);
+
+  if (!canEdit) {
+    return (
+      <div className="menu-line">
+        <span>
+          {KIND_MARKER[kind]} <strong>{KIND_NAME[kind]}</strong>: {step.text}
+        </span>
+        <span className="muted">
+          {fmtRange(step.startAt, step.durationMin)} · {fmtDuration(step.durationMin)}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="step-edit" style={{ borderLeftColor: 'var(--border)' }}>
+      <div className="step-edit-top">
+        <span className="step-kind">
+          {KIND_MARKER[kind]} {KIND_NAME[kind]}
+        </span>
+        <input
+          className="step-text"
+          defaultValue={step.text}
+          key={`t-${step.text}`}
+          aria-label="Description"
+          onBlur={(e) => {
+            const v = e.target.value.trim();
+            if (v && v !== step.text) onUpdate(step.id, { text: v });
+          }}
+        />
+        <select
+          value={step.resource || 'none'}
+          aria-label="Equipment"
+          onChange={(e) => onUpdate(step.id, { resource: e.target.value })}
+        >
+          {RESOURCES.map((r) => (
+            <option key={r} value={r}>
+              {RESOURCE_NAME[r]}
+            </option>
+          ))}
+        </select>
+        <button className="secondary small" onClick={() => onDelete(step)} aria-label="Remove this step">
+          Remove
+        </button>
+      </div>
+      <div className="step-edit-times">
+        <label>
+          Start
+          <input
+            type="datetime-local"
+            step="900"
+            defaultValue={step.startAt}
+            key={`s-${step.startAt}`}
+            onBlur={(e) => {
+              const v = e.target.value;
+              if (STAMP.test(v) && v !== step.startAt) onUpdate(step.id, { startAt: v });
+            }}
+          />
+        </label>
+        <label>
+          End
+          <input
+            type="datetime-local"
+            step="900"
+            defaultValue={end}
+            key={`e-${end}`}
+            onBlur={(e) => {
+              const v = e.target.value;
+              if (!STAMP.test(v) || v === end) return;
+              const minutes = diffMinutes(step.startAt, v);
+              if (minutes > 0) onUpdate(step.id, { durationMin: minutes });
+            }}
+          />
+        </label>
+        <span className="step-total">
+          Total <strong>{fmtDuration(step.durationMin)}</strong>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function Detail({ dish, meal, steps, color, canEdit, onScaleChange, onUpdateStep, onAddStep, onDeleteStep, onBack }) {
   const scale = dish.scale ?? 1;
   const b = blocksFor(dish.id, steps);
+  const sums = ['prep', 'assemble', 'cook'].map((k) => [
+    k,
+    b.all.filter((s) => stepKind(s) === k).reduce((t, s) => t + s.durationMin, 0),
+  ]);
   return (
     <div>
       <p>
@@ -105,17 +198,28 @@ function Detail({ dish, meal, steps, color, canEdit, onScaleChange, onBack }) {
       </p>
 
       <h3>Schedule</h3>
-      {b.all.length === 0 && <p className="muted">No blocks scheduled.</p>}
+      <p className="muted">
+        {sums
+          .filter(([, m]) => m > 0)
+          .map(([k, m]) => `${KIND_NAME[k]} ${fmtDuration(m)}`)
+          .join(' · ') || 'No blocks scheduled yet.'}
+      </p>
       {b.all.map((s) => (
-        <div key={s.id} className="menu-line">
-          <span>
-            {KIND_MARKER[stepKind(s)]} <strong>{KIND_NAME[stepKind(s)]}</strong>: {s.text}
-          </span>
-          <span className="muted">
-            {fmtRange(s.startAt, s.durationMin)} · {fmtDuration(s.durationMin)}
-          </span>
-        </div>
+        <StepRow key={s.id} step={s} canEdit={canEdit} onUpdate={onUpdateStep} onDelete={onDeleteStep} />
       ))}
+      {canEdit && (
+        <p>
+          <button className="secondary" onClick={() => onAddStep(dish, 'prep')}>
+            + Prep
+          </button>
+          <button className="secondary" onClick={() => onAddStep(dish, 'assemble')}>
+            + Assemble
+          </button>
+          <button className="secondary" onClick={() => onAddStep(dish, 'cook')}>
+            + Cook
+          </button>
+        </p>
+      )}
 
       <h3>Ingredients</h3>
       {(dish.ingredients || []).length === 0 && <p className="muted">No recipe for this dish.</p>}
@@ -157,9 +261,20 @@ function Detail({ dish, meal, steps, color, canEdit, onScaleChange, onBack }) {
   );
 }
 
-/** Menu tab: one card per dish; click a card for the full recipe. */
-export default function MenuView({ dishes, meals, steps, colorOf, canEdit, onScaleChange }) {
-  const [openId, setOpenId] = useState(null);
+/** Menu tab: one card per dish; click a card (or a block on the grid) for the full recipe and its schedule. */
+export default function MenuView({
+  dishes,
+  meals,
+  steps,
+  colorOf,
+  canEdit,
+  openId,
+  onOpenChange,
+  onScaleChange,
+  onUpdateStep,
+  onAddStep,
+  onDeleteStep,
+}) {
   const mealById = useMemo(() => Object.fromEntries(meals.map((m) => [m.id, m])), [meals]);
 
   const ordered = useMemo(() => {
@@ -177,7 +292,10 @@ export default function MenuView({ dishes, meals, steps, colorOf, canEdit, onSca
         color={colorOf(open.id)}
         canEdit={canEdit}
         onScaleChange={onScaleChange}
-        onBack={() => setOpenId(null)}
+        onUpdateStep={onUpdateStep}
+        onAddStep={onAddStep}
+        onDeleteStep={onDeleteStep}
+        onBack={() => onOpenChange(null)}
       />
     );
   }
@@ -191,7 +309,7 @@ export default function MenuView({ dishes, meals, steps, colorOf, canEdit, onSca
           meal={mealById[d.mealId]}
           steps={steps}
           color={colorOf(d.id)}
-          onOpen={() => setOpenId(d.id)}
+          onOpen={() => onOpenChange(d.id)}
         />
       ))}
     </div>

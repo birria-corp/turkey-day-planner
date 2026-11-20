@@ -16,6 +16,21 @@ function Row({ item, checked, disabled, onToggle, label }) {
   );
 }
 
+/** Aisle heading, then like items grouped under small sub-headings (fruit, herbs, cheese...). */
+function Aisles({ items, renderRow }) {
+  return groupByAisle(items).map(([aisle, groups]) => (
+    <section key={aisle} className="aisle">
+      <h3>{aisle}</h3>
+      {groups.map(([group, list]) => (
+        <div key={group || 'all'} className="shop-group">
+          {group && <h4>{group}</h4>}
+          {renderRow(list)}
+        </div>
+      ))}
+    </section>
+  ));
+}
+
 /** Shopping tab. Pass 1: tick what you already have. Pass 2: take the rest to the store and tick it into the cart. */
 export default function ShoppingView({ eventId, dishes, canEdit }) {
   const [items, setItems] = useState(null);
@@ -79,10 +94,10 @@ export default function ShoppingView({ eventId, dishes, canEdit }) {
             Tick everything you already have at home. {have.length} of {items.length} ticked.
             {!canEdit && ' Only cooks and the owner can change this.'}
           </p>
-          {groupByAisle(items).map(([aisle, list]) => (
-            <section key={aisle} className="aisle">
-              <h3>{aisle}</h3>
-              {list.map((i) => (
+          <Aisles
+            items={items}
+            renderRow={(list) =>
+              list.map((i) => (
                 <Row
                   key={i.id}
                   item={i}
@@ -91,19 +106,19 @@ export default function ShoppingView({ eventId, dishes, canEdit }) {
                   label={i.dishes.join(', ')}
                   onToggle={guard(() => updateShoppingItem(eventId, i.id, { have: !i.have }))}
                 />
-              ))}
-            </section>
-          ))}
+              ))
+            }
+          />
         </>
       ) : (
         <>
           <p className="muted">
             {inCart.length} of {need.length} in the cart. {have.length} items skipped because you have them.
           </p>
-          {groupByAisle(need).map(([aisle, list]) => (
-            <section key={aisle} className="aisle">
-              <h3>{aisle}</h3>
-              {[...list.filter((i) => !i.checked), ...list.filter((i) => i.checked)].map((i) => (
+          <Aisles
+            items={need}
+            renderRow={(list) =>
+              [...list.filter((i) => !i.checked), ...list.filter((i) => i.checked)].map((i) => (
                 <Row
                   key={i.id}
                   item={i}
@@ -112,9 +127,9 @@ export default function ShoppingView({ eventId, dishes, canEdit }) {
                   label={i.dishes.join(', ')}
                   onToggle={guard(() => updateShoppingItem(eventId, i.id, { checked: !i.checked }))}
                 />
-              ))}
-            </section>
-          ))}
+              ))
+            }
+          />
         </>
       )}
     </div>
