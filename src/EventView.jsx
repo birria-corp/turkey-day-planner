@@ -145,7 +145,7 @@ function Timeline({ meals, dishes, steps, colorOf }) {
   ));
 }
 
-export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, onCloseSettings }) {
+export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, onCloseSettings, onEventYear }) {
   const narrow = useNarrow();
   const [events, setEvents] = useState(undefined); // undefined = loading
   const [detail, setDetail] = useState(null);
@@ -211,6 +211,15 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
     const serve = detail && detail.meals.length ? detail.meals.map((m) => m.serveAt).sort()[0] : null;
     return serve ? dayKey(serve) : allDays[0];
   }, [day, allDays, detail]);
+
+  // The header shows the year of the (earliest) dinner, so moving a dinner to another year updates it.
+  const dinnerYear = useMemo(() => {
+    if (detail && detail.meals.length) return Number(detail.meals.map((m) => m.serveAt).sort()[0].slice(0, 4));
+    return current ? current.year : null;
+  }, [detail, current]);
+  useEffect(() => {
+    if (onEventYear) onEventYear(dinnerYear || null);
+  }, [dinnerYear, onEventYear]);
 
   const conflicts = useMemo(() => (detail ? findConflicts(detail.steps) : []), [detail]);
   const conflictIds = useMemo(() => new Set(conflicts.flatMap((c) => c.stepIds)), [conflicts]);
@@ -419,8 +428,7 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
       {error && <p className="error">{error}</p>}
       {current ? (
         <>
-          <h2>{current.name}</h2>
-          <p className="muted">
+          <p className="muted dates-line">
             {fmtDayHeading(current.startDate)} to {fmtDayHeading(current.endDate)}
           </p>
           <p>

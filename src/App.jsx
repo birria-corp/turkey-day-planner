@@ -1,40 +1,36 @@
 import React, { useEffect, useState } from 'react';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db, signIn, signOutUser, watchAuth, finishRedirect } from './firebase.js';
-import { thanksgivingDate, eventRange } from './scheduler/dates.js';
 import EventView from './EventView.jsx';
 
 // Same uid pinned in firestore.rules. A uid is not a secret; rules enforce access.
 const OWNER_UID = 'enVCX2fxmbMOHfPSOHcWBdvtgZi1';
-const VERSION = 'v0.8.0';
+const VERSION = 'v0.8.1';
 
-const fmt = (d) =>
-  d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-
-/** Green header: title and version on the left; who is signed in, role, settings gear and sign out on the right. */
-function Header({ user, role, settingsOpen, onToggleSettings }) {
-  const year = new Date().getFullYear();
-  const t = thanksgivingDate(year);
-  const { start, end } = eventRange(year);
+/**
+ * Green header: "Turkey Day Planner - 2026" (the year of the dinner) with the version under it.
+ * Right side, stacked: signed in as, sign out, access, settings gear (owner).
+ */
+function Header({ user, role, year, settingsOpen, onToggleSettings }) {
   return (
     <header className="banner">
       <div className="banner-left">
-        <h1>Turkey Day Planner</h1>
+        <h1>Turkey Day Planner{year ? ` - ${year}` : ''}</h1>
         <div className="version">{VERSION}</div>
-        <p>Thanksgiving {year}: {fmt(t)}</p>
-        <p>Default planning week: {fmt(start)} to {fmt(end)}</p>
       </div>
       {user && (
         <div className="banner-right">
-          <div className="who">
+          <div>
             Signed in as <strong>{user.displayName}</strong>
-            {role && (
-              <>
-                <br />
-                Access: <strong>{role}</strong>
-              </>
-            )}
           </div>
+          <button className="linklike" onClick={() => signOutUser()}>
+            Sign out
+          </button>
+          {role && (
+            <div>
+              Access: <strong>{role}</strong>
+            </div>
+          )}
           {role === 'owner' && (
             <button
               className={`icon-btn${settingsOpen ? ' active' : ''}`}
@@ -45,9 +41,6 @@ function Header({ user, role, settingsOpen, onToggleSettings }) {
               ⚙️
             </button>
           )}
-          <button className="ghost" onClick={() => signOutUser()}>
-            Sign out
-          </button>
         </div>
       )}
     </header>
@@ -59,6 +52,7 @@ export default function App() {
   const [member, setMember] = useState(undefined); // undefined = unknown, null = not approved, object = approved
   const [requested, setRequested] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [eventYear, setEventYear] = useState(null); // year of the dinner, reported by the planner
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -115,6 +109,7 @@ export default function App() {
       <Header
         user={user}
         role={member ? member.role : ''}
+        year={eventYear}
         settingsOpen={settingsOpen}
         onToggleSettings={() => setSettingsOpen((v) => !v)}
       />
@@ -125,6 +120,7 @@ export default function App() {
           ownerUid={OWNER_UID}
           settingsOpen={settingsOpen}
           onCloseSettings={() => setSettingsOpen(false)}
+          onEventYear={setEventYear}
         />
       ) : (
         <>
