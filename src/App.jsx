@@ -7,7 +7,7 @@ import { pendingCount } from './saveStatus.js';
 
 // Same uid pinned in firestore.rules. A uid is not a secret; rules enforce access.
 const OWNER_UID = 'enVCX2fxmbMOHfPSOHcWBdvtgZi1';
-const VERSION = 'v0.9.0';
+const VERSION = 'v0.9.1';
 
 /**
  * Green header: "Turkey Day Planner - 2026" (the year of the dinner) with the version under it.

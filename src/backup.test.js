@@ -13,6 +13,7 @@ const detail = {
     {
       id: 'mash', mealId: 'thu', order: 1, title: 'Mashed Potatoes', cookName: 'AJ', emoji: '🥔', color: 'cream', scale: 2,
       ingredients: [{ name: 'Russet potatoes', qty: 2, unit: 'lb', aisle: 'Produce' }], method: ['Boil.'], notes: 'n',
+      myNotes: 'Use the big pot. AJ likes extra butter.',
     },
     { id: 'turkey', mealId: 'thu', order: 0, title: 'Turkey', cookName: 'Spencer', emoji: '🦃', color: 'brown', scale: 1, ingredients: [], method: [] },
   ],
@@ -56,7 +57,11 @@ describe('buildBackup', () => {
 
   it('round-trips through the importer without losing the plan', () => {
     const docs = toEventDocs(b);
-    expect(docs.dishes.find((d) => d.id === 'mash')).toMatchObject({ cookName: 'AJ', scale: 2 });
+    expect(docs.dishes.find((d) => d.id === 'mash')).toMatchObject({
+      cookName: 'AJ',
+      scale: 2,
+      myNotes: 'Use the big pot. AJ likes extra butter.',
+    });
     expect(docs.steps).toHaveLength(3);
     expect(docs.steps.find((s) => s.text === 'Shopping')).toMatchObject({ dishId: '', kind: 'event' });
     expect(docs.shopping.map((i) => i.id)).toContain('russet-potatoes-wt');

@@ -133,6 +133,11 @@ export function updateDishScale(id, dishId, scale) {
   return track(updateDoc(doc(db, 'events', id, 'dishes', dishId), { scale }));
 }
 
+/** Spencer's own notes on a recipe (kept apart from the recipe's source notes). Cooks and owner only. */
+export function updateDishNotes(id, dishId, myNotes) {
+  return track(updateDoc(doc(db, 'events', id, 'dishes', dishId), { myNotes }));
+}
+
 /** Live shopping list. Returns the unsubscribe function. */
 export function subscribeShopping(id, onData, onError) {
   return onSnapshot(collection(db, 'events', id, 'shopping'), (snap) => onData(withId(snap)), onError);

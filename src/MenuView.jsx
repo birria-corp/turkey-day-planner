@@ -147,7 +147,7 @@ export function StepRow({ step, canEdit, onUpdate, onDelete }) {
   );
 }
 
-function Detail({ dish, meal, steps, color, canEdit, onScaleChange, onUpdateStep, onAddStep, onDeleteStep, onPrint, onBack }) {
+function Detail({ dish, meal, steps, color, canEdit, onScaleChange, onNotesChange, onUpdateStep, onAddStep, onDeleteStep, onPrint, onBack }) {
   const scale = dish.scale ?? 1;
   const b = blocksFor(dish.id, steps);
   const sums = ['prep', 'assemble', 'cook'].map((k) => [
@@ -249,9 +249,28 @@ function Detail({ dish, meal, steps, color, canEdit, onScaleChange, onUpdateStep
 
       {dish.notes && (
         <>
-          <h3>Notes</h3>
+          <h3>Recipe notes</h3>
           <p>{dish.notes}</p>
         </>
+      )}
+
+      <h3>My notes</h3>
+      {canEdit ? (
+        <textarea
+          className="my-notes"
+          rows={5}
+          defaultValue={dish.myNotes || ''}
+          key={`n-${dish.myNotes || ''}`}
+          placeholder="Add your own notes for this recipe: swaps, timing tweaks, what to change next year…"
+          onBlur={(e) => {
+            const v = e.target.value;
+            if (v !== (dish.myNotes || '')) onNotesChange(dish.id, v);
+          }}
+        />
+      ) : dish.myNotes ? (
+        <p className="notes-text">{dish.myNotes}</p>
+      ) : (
+        <p className="muted">No notes yet.</p>
       )}
     </div>
   );
@@ -309,12 +328,15 @@ export default function MenuView({
   openId,
   onOpenChange,
   onScaleChange,
+  onNotesChange,
   onUpdateStep,
   onAddStep,
   onDeleteStep,
   onMoveMeal,
 }) {
-  const [preview, setPreview] = useState(null); // 'all' or a dish id: show the print preview
+  const [preview, setPreview] = useState(null); // { ids: null (all) | [dish ids] }: show the print preview
+  const [picking, setPicking] = useState(false); // the "select recipes to print" checklist
+  const [picked, setPicked] = useState({});
   const mealById = useMemo(() => Object.fromEntries(meals.map((m) => [m.id, m])), [meals]);
 
   const ordered = useMemo(() => {
@@ -323,10 +345,11 @@ export default function MenuView({
   }, [dishes, mealById]);
 
   if (preview) {
-    const one = preview === 'all' ? null : dishes.find((d) => d.id === preview);
+    const ids = preview.ids;
+    const one = ids && ids.length === 1 ? dishes.find((d) => d.id === ids[0]) : null;
     return (
       <PrintShell title={one ? one.title : 'Recipes'} onClose={() => setPreview(null)}>
-        <RecipesPrint dishes={dishes} meals={meals} steps={steps} onlyDishId={one ? one.id : null} />
+        <RecipesPrint dishes={dishes} meals={meals} steps={steps} onlyDishIds={ids} />
       </PrintShell>
     );
   }
@@ -341,10 +364,11 @@ export default function MenuView({
         color={colorOf(open.id)}
         canEdit={canEdit}
         onScaleChange={onScaleChange}
+        onNotesChange={onNotesChange}
         onUpdateStep={onUpdateStep}
         onAddStep={onAddStep}
         onDeleteStep={onDeleteStep}
-        onPrint={() => setPreview(open.id)}
+        onPrint={() => setPreview({ ids: [open.id] })}
         onBack={() => onOpenChange(null)}
       />
     );
@@ -372,10 +396,44 @@ export default function MenuView({
 
       <h3>Dishes</h3>
       <p>
-        <button className="secondary" onClick={() => setPreview('all')}>
+        <button className="secondary" onClick={() => setPicking((v) => !v)}>
+          ☑ Select recipes to print
+        </button>
+        <button className="secondary" onClick={() => setPreview({ ids: null })}>
           🖨 Print all recipes
         </button>
       </p>
+      {picking && (
+        <div className="pick-box">
+          {ordered.map((d) => (
+            <label key={d.id} className="pick-row">
+              <input
+                type="checkbox"
+                checked={!!picked[d.id]}
+                onChange={() => setPicked((p) => ({ ...p, [d.id]: !p[d.id] }))}
+              />{' '}
+              {d.emoji} {d.title}
+            </label>
+          ))}
+          <p>
+            <button
+              className="secondary"
+              onClick={() => setPicked(Object.fromEntries(ordered.map((d) => [d.id, true])))}
+            >
+              Select all
+            </button>
+            <button className="secondary" onClick={() => setPicked({})}>
+              Clear
+            </button>
+            <button
+              disabled={!ordered.some((d) => picked[d.id])}
+              onClick={() => setPreview({ ids: ordered.filter((d) => picked[d.id]).map((d) => d.id) })}
+            >
+              🖨 Preview selected ({ordered.filter((d) => picked[d.id]).length})
+            </button>
+          </p>
+        </div>
+      )}
       <div className="menu-grid">
         {ordered.map((d) => (
           <Card

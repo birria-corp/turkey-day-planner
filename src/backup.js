@@ -23,6 +23,7 @@ export function buildBackup(event, detail, shopping = [], now = new Date()) {
     ingredients: d.ingredients || [],
     method: d.method || [],
     notes: d.notes || '',
+    myNotes: d.myNotes || '',
   }));
 
   const byTime = (a, b) => (a.startAt < b.startAt ? -1 : a.startAt > b.startAt ? 1 : 0);

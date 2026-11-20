@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { toEventDocs, validateImport } from './importer.js';
-import { blockText, fmtDuration, fmtRange, laneOf, stepKind, stepLabel } from './labels.js';
+import { blockText, fmtDuration, fmtRange, laneOf, stepKind, stepLabel, timeSummary } from './labels.js';
 
 const menu = () => ({
   event: { name: 'Thanksgiving 2026', year: 2026, startDate: '2026-11-23', endDate: '2026-11-28' },
@@ -107,6 +107,17 @@ describe('labels', () => {
     expect(laneOf({ dishId: 'a', kind: 'cook', resource: 'stovetop' })).toBe('stove');
     expect(laneOf({ dishId: 'a', kind: 'cook', resource: 'smoker' })).toBe('stove');
     expect(laneOf({ dishId: 'a', kind: 'cook', resource: 'hands' })).toBe('prep');
+  });
+  it('sums a dish\'s overall times, keeping brine and resting out of the hands-on total', () => {
+    const t = timeSummary([
+      { dishId: 'a', kind: 'prep', durationMin: 30, resource: 'hands' },
+      { dishId: 'a', kind: 'prep', durationMin: 45, resource: 'hands' },
+      { dishId: 'a', kind: 'assemble', durationMin: 20, resource: 'hands' },
+      { dishId: 'a', kind: 'cook', durationMin: 150, resource: 'oven' },
+      { dishId: 'a', kind: 'cook', durationMin: 3030, resource: 'fridge' },
+      { dishId: 'a', kind: 'rest', durationMin: 45, resource: 'none' },
+    ]);
+    expect(t).toEqual({ prep: 75, assemble: 20, cook: 150, waiting: 3075, handsOn: 245 });
   });
   it('formats durations and ranges', () => {
     expect(fmtDuration(40)).toBe('40 min');

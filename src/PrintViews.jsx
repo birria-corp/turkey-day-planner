@@ -1,5 +1,5 @@
 import React from 'react';
-import { KIND_MARKER, KIND_NAME, fmtDuration, fmtRange, stepKind } from './labels.js';
+import { fmtDuration, timeSummary } from './labels.js';
 import { sortDishes } from './palette.js';
 import { groupByAisle, ingredientLine } from './shopping.js';
 
@@ -27,7 +27,13 @@ export function PrintShell({ title, onClose, children }) {
 
 function RecipePage({ dish, meal, steps }) {
   const scale = dish.scale ?? 1;
-  const mine = steps.filter((s) => s.dishId === dish.id).sort((a, b) => (a.startAt < b.startAt ? -1 : 1));
+  const t = timeSummary(steps.filter((s) => s.dishId === dish.id));
+  const times = [
+    ['Prep', t.prep],
+    ['Assemble', t.assemble],
+    ['Cook', t.cook],
+    ['Resting / chilling', t.waiting],
+  ].filter(([, m]) => m > 0);
   return (
     <section className="print-page">
       <h2>
@@ -40,24 +46,16 @@ function RecipePage({ dish, meal, steps }) {
         {dish.source ? ` · ${dish.source}` : ''}
       </p>
 
-      {mine.length > 0 && (
-        <>
-          <h3>Schedule</h3>
-          <table className="print-table">
-            <tbody>
-              {mine.map((s) => (
-                <tr key={s.id}>
-                  <td>
-                    {KIND_MARKER[stepKind(s)]} {KIND_NAME[stepKind(s)]}
-                  </td>
-                  <td>{s.text}</td>
-                  <td>{fmtRange(s.startAt, s.durationMin)}</td>
-                  <td>{fmtDuration(s.durationMin)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </>
+      {times.length > 0 && (
+        <p className="print-times">
+          {times.map(([label, m]) => `${label} ${fmtDuration(m)}`).join(' · ')}
+          {t.handsOn > 0 && (
+            <>
+              {' · '}
+              <strong>Hands-on total {fmtDuration(t.handsOn)}</strong>
+            </>
+          )}
+        </p>
       )}
 
       {(dish.ingredients || []).length > 0 && (
@@ -94,12 +92,19 @@ function RecipePage({ dish, meal, steps }) {
       )}
 
       {dish.notes && <p>{dish.notes}</p>}
+
+      {dish.myNotes && (
+        <>
+          <h3>My notes</h3>
+          <p className="notes-text">{dish.myNotes}</p>
+        </>
+      )}
     </section>
   );
 }
 
-/** One recipe per page, in dinner order. Pass `onlyDishId` for a single recipe. */
-export function RecipesPrint({ dishes, meals, steps, onlyDishId }) {
+/** One recipe per page, in dinner order. Pass `onlyDishIds` (an array) to print just those recipes. */
+export function RecipesPrint({ dishes, meals, steps, onlyDishIds }) {
   const mealById = Object.fromEntries(meals.map((m) => [m.id, m]));
   const ordered = [...sortDishes(dishes)].sort((a, b) => {
     const sa = mealById[a.mealId] ? mealById[a.mealId].serveAt : '';
@@ -107,7 +112,7 @@ export function RecipesPrint({ dishes, meals, steps, onlyDishId }) {
     return sa < sb ? -1 : sa > sb ? 1 : 0;
   });
   return ordered
-    .filter((d) => !onlyDishId || d.id === onlyDishId)
+    .filter((d) => !onlyDishIds || onlyDishIds.includes(d.id))
     .map((d) => <RecipePage key={d.id} dish={d} meal={mealById[d.mealId]} steps={steps} />);
 }
 

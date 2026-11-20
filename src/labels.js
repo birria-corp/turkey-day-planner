@@ -52,6 +52,19 @@ export function blockText(step, dish) {
   };
 }
 
+/**
+ * Overall times for one dish from its steps, in minutes: prep, assemble, cook (not waiting),
+ * waiting (brine, air-dry, resting, chilling) and the hands-on total (prep + assemble + cook).
+ */
+export function timeSummary(steps) {
+  const sum = (f) => steps.filter(f).reduce((t, s) => t + s.durationMin, 0);
+  const waiting = (s) => s.resource === 'fridge' || stepKind(s) === 'rest';
+  const prep = sum((s) => stepKind(s) === 'prep');
+  const assemble = sum((s) => stepKind(s) === 'assemble');
+  const cook = sum((s) => stepKind(s) === 'cook' && !waiting(s));
+  return { prep, assemble, cook, waiting: sum(waiting), handsOn: prep + assemble + cook };
+}
+
 /** 40 -> "40 min", 150 -> "2 hr 30 min", 1365 -> "22 hr 45 min". */
 export function fmtDuration(min) {
   if (min < 60) return `${min} min`;

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { flushSync } from 'react-dom';
 import {
   addStep,
   deleteEvent,
@@ -10,6 +11,7 @@ import {
   loadSampleEvent,
   moveMeal,
   updateDishCook,
+  updateDishNotes,
   updateDishScale,
   updateStep,
 } from './events.js';
@@ -171,6 +173,7 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
   const dayWrapWidth = useElementWidth(dayWrap);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [printing, setPrinting] = useState(false); // true only while the Plan tab is being printed
 
   const load = useCallback(async () => {
     try {
@@ -381,15 +384,34 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
     }
   }
 
-  // Print the Plan tab as it is on screen: scaled to fit one page, with the browser's print window.
+  // Print the Plan tab on one landscape page. For printing the rows switch to the short height, then the
+  // whole grid is scaled down to fit the page's width and height, and the browser's print window opens.
   function printPlan() {
+    flushSync(() => setPrinting(true));
     const el = document.querySelector('.print-fit');
     if (el) {
-      const landscape = view === 'week';
-      const z = Math.min(1, (landscape ? 1000 : 700) / el.scrollWidth, (landscape ? 640 : 960) / el.scrollHeight);
+      const z = Math.min(1, 970 / el.scrollWidth, 650 / el.scrollHeight);
       document.documentElement.style.setProperty('--print-zoom', String(z));
     }
+    const done = () => {
+      window.removeEventListener('afterprint', done);
+      setPrinting(false);
+    };
+    window.addEventListener('afterprint', done);
     window.print();
+  }
+
+  async function changeNotes(dishId, myNotes) {
+    try {
+      await updateDishNotes(current.id, dishId, myNotes);
+      setDetail((d) => ({
+        ...d,
+        dishes: d.dishes.map((x) => (x.id === dishId ? { ...x, myNotes } : x)),
+      }));
+      setError('');
+    } catch (e) {
+      setError(e.message);
+    }
   }
 
   function replaceSample() {
@@ -467,7 +489,7 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
   );
 
   // On a phone the Day view is squeezed to the screen and uses taller rows so blocks stay readable.
-  const dayRowH = narrow ? Math.max(ROW_HEIGHTS[rows], ROW_HEIGHTS.large) : ROW_HEIGHTS[rows];
+  const dayRowH = printing ? ROW_HEIGHTS.compact : narrow ? Math.max(ROW_HEIGHTS[rows], ROW_HEIGHTS.large) : ROW_HEIGHTS[rows];
   const fitWidth = narrow && dayWrapWidth ? Math.max(200, dayWrapWidth - PHONE_GUTTER) : null;
 
   const calendarProps = detail && {
@@ -478,7 +500,7 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
     labelOf,
     textOf,
     dishById,
-    rowH: ROW_HEIGHTS[rows],
+    rowH: printing ? ROW_HEIGHTS.compact : ROW_HEIGHTS[rows],
     canEdit,
     conflictIds,
     onOpenDish: openDish,
@@ -505,8 +527,11 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
           </p>
 
           {tab === 'plan' && (
-            <>
-              <h1 className="print-only print-title">Turkey Day Planner{dinnerYear ? ` - ${dinnerYear}` : ''}</h1>
+            <div className={`print-sheet${view === 'timeline' ? ' portrait' : ''}`}>
+              <h1 className="print-only print-title">
+                Turkey Day Planner{dinnerYear ? ` - ${dinnerYear}` : ''} · {fmtDayHeading(current.startDate)} to{' '}
+                {fmtDayHeading(current.endDate)}
+              </h1>
               <p className="toolbar no-print">
                 <span>
                   {viewBtn('week', 'Week')}
@@ -615,7 +640,7 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
               {detail && view === 'timeline' && (
                 <Timeline meals={detail.meals} dishes={detail.dishes} steps={detail.steps} colorOf={colorOf} />
               )}
-            </>
+            </div>
           )}
 
           {tab === 'menu' && detail && (
@@ -628,6 +653,7 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
               openId={menuOpenId}
               onOpenChange={setMenuOpenId}
               onScaleChange={changeScale}
+              onNotesChange={changeNotes}
               onUpdateStep={patchStep}
               onAddStep={createStep}
               onDeleteStep={removeStep}

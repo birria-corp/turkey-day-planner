@@ -74,6 +74,7 @@ export function toEventDocs(data) {
       ingredients: d.ingredients || [],
       method: d.method || [],
       notes: d.notes || '',
+      myNotes: d.myNotes || '',
     }),
   );
 

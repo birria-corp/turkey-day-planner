@@ -427,6 +427,12 @@ button.small { padding: 3px 8px; font-size: 13px; margin-right: 0; }
 .print-page:last-child { border-bottom: 0; break-after: auto; }
 .print-table { border-collapse: collapse; width: 100%; font-size: 14px; }
 .print-table td { border-bottom: 1px solid #ccc; padding: 3px 8px 3px 0; vertical-align: top; }
+.print-times { font-size: 14px; margin: 4px 0 8px; }
+.pick-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; max-width: 520px; }
+.pick-row { display: block; padding: 5px 0; cursor: pointer; font-size: 15px; }
+.pick-row input { transform: scale(1.25); margin-right: 6px; }
+.my-notes { width: 100%; max-width: 720px; font: inherit; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: #fff; }
+.notes-text { white-space: pre-wrap; }
 .pl-aisle h3 { margin: 12px 0 2px; border-bottom: 2px solid #000; }
 .pl-aisle h4 { margin: 6px 0 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: #555; }
 .pl-row { display: flex; gap: 10px; align-items: baseline; padding: 4px 0; border-bottom: 1px dotted #aaa; font-size: 15px; break-inside: avoid; }
@@ -439,10 +445,13 @@ button.small { padding: 3px 8px; font-size: 13px; margin-right: 0; }
 @media print {
   body { background: #fff; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .no-print, .banner, .toolbar, .daypick, .conflicts, .file-btn, button:not(.bar):not(.chip-btn):not(.ag-item) { display: none !important; }
+  .no-print, .banner, .toolbar, .daypick, .conflicts, .dates-line, .file-btn, button:not(.bar):not(.chip-btn):not(.ag-item) { display: none !important; }
   .print-only { display: block; }
   .page, .page.wide { max-width: none; padding: 0; margin: 0; }
-  .print-fit { zoom: var(--print-zoom, 1); overflow: visible !important; page: grid; }
+  /* The title and the grid share one landscape page (a timeline prints portrait). */
+  .print-sheet { page: grid; }
+  .print-sheet.portrait { page: doc; }
+  .print-fit { zoom: var(--print-zoom, 1); overflow: visible !important; }
   .cal-wrap, .day-wrap { overflow: visible !important; }
   .print-preview { margin: 0; }
   .print-preview .print-doc { page: doc; border: 0; padding: 0; max-width: none; margin: 0; }
