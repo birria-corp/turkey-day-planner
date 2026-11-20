@@ -3,7 +3,6 @@ import {
   getAuth,
   GoogleAuthProvider,
   signInWithPopup,
-  signInWithRedirect,
   getRedirectResult,
   signOut,
   onAuthStateChanged,
@@ -34,15 +33,20 @@ export const db = initializeFirestore(app, {
 
 const provider = new GoogleAuthProvider();
 
-// Desktop uses a popup; phones use a redirect (popups are unreliable on mobile).
-// signInWithRedirect on desktop GitHub Pages fails (COOP + IndexedDB), so keep the split.
-const isMobile = () => /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-
+// Always use the popup, on phones too. signInWithRedirect does not work from GitHub Pages:
+// the app (github.io) and the sign-in domain (firebaseapp.com) differ, and browsers block the
+// shared storage the redirect result travels through, so you land back on the sign-in button.
+// Same approach as ZepTrack, which signs in on Android with a popup.
 export async function signIn() {
-  if (isMobile()) {
-    await signInWithRedirect(auth, provider);
-  } else {
+  try {
     await signInWithPopup(auth, provider);
+  } catch (e) {
+    if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') return;
+    if (e.code === 'auth/popup-blocked') {
+      throw new Error('Your browser blocked the sign-in window. Allow popups for this site, then tap Sign in again.');
+    }
+    console.error('sign-in error', e.code, e.message);
+    throw e;
   }
 }
 
