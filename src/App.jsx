@@ -3,10 +3,11 @@ import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db, signIn, signOutUser, watchAuth, finishRedirect } from './firebase.js';
 import { thanksgivingDate, eventRange } from './scheduler/dates.js';
 import Admin from './Admin.jsx';
+import EventView from './EventView.jsx';
 
 // Same uid pinned in firestore.rules. A uid is not a secret; rules enforce access.
 const OWNER_UID = 'enVCX2fxmbMOHfPSOHcWBdvtgZi1';
-const VERSION = 'v0.3.0';
+const VERSION = 'v0.4.0';
 
 const fmt = (d) =>
   d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
@@ -90,7 +91,8 @@ export default function App() {
       <p>Signed in as <strong>{user.displayName}</strong></p>
       {member ? (
         <>
-          <p>Access: <strong>{member.role}</strong>. The planner is coming next.</p>
+          <p>Access: <strong>{member.role}</strong></p>
+          <EventView isOwner={member.role === 'owner'} ownerUid={OWNER_UID} />
           {member.role === 'owner' && <Admin ownerUid={OWNER_UID} />}
         </>
       ) : (

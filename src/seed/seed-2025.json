@@ -1,0 +1,61 @@
+{
+  "_note": "Seed from 'Thanksgiving 2025 - Daily schedule.pdf'. Spencer verified 11/20 (turkey-thu split into oven 11:30-13:00 + rest 13:00-15:00; oven capacity 2). No ingredients, temps or recipes. Dates are real 2025 calendar days (Thanksgiving = 2025-11-27).",
+  "event": {
+    "name": "Thanksgiving 2025",
+    "year": 2025,
+    "startDate": "2025-11-24",
+    "endDate": "2025-11-29"
+  },
+  "meals": [
+    { "id": "thu", "name": "Thursday Dinner", "serveAt": "2025-11-27T15:00" },
+    { "id": "sat", "name": "Saturday Dinner", "serveAt": "2025-11-29T15:00" }
+  ],
+  "dishes": [
+    { "id": "mashed", "meal": "thu", "title": "Mashed Potatoes", "cook": "AJ" },
+    { "id": "turkey-thu", "meal": "thu", "title": "Turkey (oven)", "cook": "Spencer" },
+    { "id": "stuffing", "meal": "thu", "title": "Cornbread Stuffing", "cook": "Spencer" },
+    { "id": "sprouts", "meal": "thu", "title": "Roasted Brussel Sprouts", "cook": "Spencer" },
+    { "id": "salad", "meal": "thu", "title": "Salad", "cook": "Lauren" },
+    { "id": "cranberry", "meal": "thu", "title": "Cranberry Sauce", "cook": "Lauren" },
+    { "id": "lasagna", "meal": "thu", "title": "Butternut Squash Lasagna", "cook": "Baker" },
+    { "id": "turkey-sat", "meal": "sat", "title": "Turkey (smoker)", "cook": "Spencer" },
+    { "id": "greenbeans", "meal": "sat", "title": "Green Beans", "cook": "Spencer" },
+    { "id": "stock", "meal": "sat", "title": "Turkey Stock", "cook": "Spencer" },
+    { "id": "gratin", "meal": "sat", "title": "Hasselback Gratin", "cook": "Spencer" },
+    { "id": "wellington", "meal": "sat", "title": "Mushroom Wellington", "cook": "Baker" }
+  ],
+  "steps": [
+    { "dish": "turkey-thu", "text": "Turkey in brine", "startAt": "2025-11-25T19:00", "durationMin": 30, "resource": "fridge", "anchor": "fixed" },
+    { "dish": "turkey-thu", "text": "Turkey out, dry, spatchcock", "startAt": "2025-11-26T11:30", "durationMin": 30, "resource": "hands", "anchor": "fixed" },
+    { "dish": "turkey-thu", "text": "Turkey in oven", "startAt": "2025-11-27T11:30", "durationMin": 90, "resource": "oven", "anchor": "fixed" },
+    { "dish": "turkey-thu", "text": "Turkey rests", "startAt": "2025-11-27T13:00", "durationMin": 120, "resource": "none", "anchor": "fixed" },
+
+    { "dish": "stuffing", "text": "Cook cornbread", "startAt": "2025-11-25T18:00", "durationMin": 30, "resource": "oven", "anchor": "fixed" },
+    { "dish": "stuffing", "text": "Cornbread stuffing", "startAt": "2025-11-27T13:00", "durationMin": 30, "resource": "oven", "anchor": "fixed" },
+
+    { "dish": "cranberry", "text": "Cranberry sauce", "startAt": "2025-11-25T18:30", "durationMin": 30, "resource": "stovetop", "anchor": "fixed" },
+
+    { "dish": "mashed", "text": "Mashed potatoes", "startAt": "2025-11-27T13:30", "durationMin": 30, "resource": "stovetop", "anchor": "fixed" },
+    { "dish": "sprouts", "text": "Roasted Brussel sprouts", "startAt": "2025-11-27T14:00", "durationMin": 30, "resource": "oven", "anchor": "fixed" },
+    { "dish": "salad", "text": "Salad", "startAt": "2025-11-27T14:30", "durationMin": 30, "resource": "hands", "anchor": "fixed" },
+
+    { "dish": "lasagna", "text": "Roast squash", "startAt": "2025-11-26T17:30", "durationMin": 30, "resource": "oven", "anchor": "fixed" },
+    { "dish": "lasagna", "text": "Assemble lasagna", "startAt": "2025-11-26T18:00", "durationMin": 30, "resource": "hands", "anchor": "fixed" },
+    { "dish": "lasagna", "text": "Cook lasagna", "startAt": "2025-11-27T13:30", "durationMin": 90, "resource": "oven", "anchor": "fixed" },
+
+    { "dish": "stock", "text": "Turkey stock (Thursday evening, after dinner; listed under Saturday on the sheet)", "startAt": "2025-11-27T17:00", "durationMin": 180, "resource": "stovetop", "anchor": "fixed" },
+
+    { "dish": "turkey-sat", "text": "Turkey out, dry", "startAt": "2025-11-28T11:30", "durationMin": 30, "resource": "hands", "anchor": "fixed" },
+    { "dish": "turkey-sat", "text": "Turkey on smoker", "startAt": "2025-11-29T10:30", "durationMin": 270, "resource": "smoker", "anchor": "fixed" },
+
+    { "dish": "wellington", "text": "Mushroom Wellington prep", "startAt": "2025-11-28T12:30", "durationMin": 60, "resource": "hands", "anchor": "fixed" },
+    { "dish": "wellington", "text": "Wellington assemble", "startAt": "2025-11-29T12:00", "durationMin": 30, "resource": "hands", "anchor": "fixed" },
+    { "dish": "wellington", "text": "Wellington bake", "startAt": "2025-11-29T12:30", "durationMin": 60, "resource": "oven", "anchor": "fixed" },
+
+    { "dish": "gratin", "text": "Hasselback gratin", "startAt": "2025-11-29T13:30", "durationMin": 60, "resource": "oven", "anchor": "fixed" },
+    { "dish": "greenbeans", "text": "Green beans", "startAt": "2025-11-29T14:30", "durationMin": 30, "resource": "stovetop", "anchor": "fixed" }
+  ],
+  "events_other": [
+    { "text": "Shopping", "startAt": "2025-11-25T16:00", "durationMin": 90 }
+  ]
+}
