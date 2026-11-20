@@ -2,6 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db, signIn, signOutUser, watchAuth, finishRedirect } from './firebase.js';
 import { thanksgivingDate, eventRange } from './scheduler/dates.js';
+import Admin from './Admin.jsx';
+
+// Same uid pinned in firestore.rules. A uid is not a secret; rules enforce access.
+const OWNER_UID = 'enVCX2fxmbMOHfPSOHcWBdvtgZi1';
+const VERSION = 'v0.3.0';
 
 const fmt = (d) =>
   d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
@@ -40,6 +45,10 @@ export default function App() {
       setRequested(false);
       return;
     }
+    if (user.uid === OWNER_UID) {
+      setMember({ role: 'owner' });
+      return;
+    }
     getDoc(doc(db, 'members', user.uid))
       .then((snap) => setMember(snap.exists() ? snap.data() : null))
       .catch(() => setMember(null));
@@ -70,7 +79,7 @@ export default function App() {
           Sign in with Google
         </button>
         {error && <p style={{ color: 'crimson' }}>{error}</p>}
-        <p style={{ color: '#666' }}>v0.2.0</p>
+        <p style={{ color: '#666' }}>{VERSION}</p>
       </main>
     );
   }
@@ -80,7 +89,10 @@ export default function App() {
       <Header />
       <p>Signed in as <strong>{user.displayName}</strong></p>
       {member ? (
-        <p>Access: <strong>{member.role}</strong>. The planner is coming next.</p>
+        <>
+          <p>Access: <strong>{member.role}</strong>. The planner is coming next.</p>
+          {member.role === 'owner' && <Admin ownerUid={OWNER_UID} />}
+        </>
       ) : (
         <>
           <p>You are not approved yet. Send this ID to Spencer, or request access:</p>
@@ -94,7 +106,7 @@ export default function App() {
       )}
       <p><button style={btn} onClick={() => signOutUser()}>Sign out</button></p>
       {error && <p style={{ color: 'crimson' }}>{error}</p>}
-      <p style={{ color: '#666' }}>v0.2.0</p>
+      <p style={{ color: '#666' }}>{VERSION}</p>
     </main>
   );
 }
