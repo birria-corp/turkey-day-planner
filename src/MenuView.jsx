@@ -1,21 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import { KIND_MARKER, KIND_NAME, RESOURCE_NAME, fmtDuration, fmtRange, stepKind } from './labels.js';
-import { fmtQty, scaleQty } from './shopping.js';
+import { ingredientLine } from './shopping.js';
+import { PrintShell, RecipesPrint } from './PrintViews.jsx';
 import { sortDishes } from './palette.js';
 import { addMinutes, diffMinutes, fmtWhen } from './scheduler/time.js';
 import { describeDelta, planMealMove } from './scheduler/meal.js';
 
-const PLURAL = { clove: 'cloves', stalk: 'stalks', sprig: 'sprigs', can: 'cans', box: 'boxes', head: 'heads', bunch: 'bunches', handful: 'handfuls', inch: 'inches' };
 const STAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
 const RESOURCES = ['oven', 'stovetop', 'smoker', 'fridge', 'hands', 'none'];
-
-/** "1 1/2 tsp ground cumin" with the dish's scale applied. */
-function ingredientLine(ing, scale) {
-  const q = scaleQty(ing, scale);
-  if (q == null) return { amount: 'as needed', name: ing.name };
-  const unit = ing.unit ? (q > 1 && PLURAL[ing.unit] ? PLURAL[ing.unit] : ing.unit) : '';
-  return { amount: `${fmtQty(q)}${unit ? ` ${unit}` : ''}`, name: ing.name };
-}
 
 /** One dish's steps, grouped as prep blocks and cook blocks (rest counts with cook). */
 function blocksFor(dishId, steps) {
@@ -70,7 +62,7 @@ function Card({ dish, meal, steps, color, onOpen }) {
 }
 
 /** One editable step: description, start, end and total time. Editing start moves it; editing end changes its length. */
-function StepRow({ step, canEdit, onUpdate, onDelete }) {
+export function StepRow({ step, canEdit, onUpdate, onDelete }) {
   const kind = stepKind(step);
   const end = addMinutes(step.startAt, step.durationMin);
 
@@ -155,7 +147,7 @@ function StepRow({ step, canEdit, onUpdate, onDelete }) {
   );
 }
 
-function Detail({ dish, meal, steps, color, canEdit, onScaleChange, onUpdateStep, onAddStep, onDeleteStep, onBack }) {
+function Detail({ dish, meal, steps, color, canEdit, onScaleChange, onUpdateStep, onAddStep, onDeleteStep, onPrint, onBack }) {
   const scale = dish.scale ?? 1;
   const b = blocksFor(dish.id, steps);
   const sums = ['prep', 'assemble', 'cook'].map((k) => [
@@ -167,6 +159,9 @@ function Detail({ dish, meal, steps, color, canEdit, onScaleChange, onUpdateStep
       <p>
         <button className="secondary" onClick={onBack}>
           ← All dishes
+        </button>
+        <button className="secondary" onClick={onPrint}>
+          🖨 Print this recipe
         </button>
       </p>
       <h2 style={{ borderLeft: `8px solid ${color.bg}`, paddingLeft: 10 }}>
@@ -319,12 +314,22 @@ export default function MenuView({
   onDeleteStep,
   onMoveMeal,
 }) {
+  const [preview, setPreview] = useState(null); // 'all' or a dish id: show the print preview
   const mealById = useMemo(() => Object.fromEntries(meals.map((m) => [m.id, m])), [meals]);
 
   const ordered = useMemo(() => {
     const meal = (d) => (mealById[d.mealId] ? mealById[d.mealId].serveAt : '');
     return [...sortDishes(dishes)].sort((a, b) => (meal(a) < meal(b) ? -1 : meal(a) > meal(b) ? 1 : 0));
   }, [dishes, mealById]);
+
+  if (preview) {
+    const one = preview === 'all' ? null : dishes.find((d) => d.id === preview);
+    return (
+      <PrintShell title={one ? one.title : 'Recipes'} onClose={() => setPreview(null)}>
+        <RecipesPrint dishes={dishes} meals={meals} steps={steps} onlyDishId={one ? one.id : null} />
+      </PrintShell>
+    );
+  }
 
   const open = dishes.find((d) => d.id === openId);
   if (open) {
@@ -339,6 +344,7 @@ export default function MenuView({
         onUpdateStep={onUpdateStep}
         onAddStep={onAddStep}
         onDeleteStep={onDeleteStep}
+        onPrint={() => setPreview(open.id)}
         onBack={() => onOpenChange(null)}
       />
     );
@@ -365,6 +371,11 @@ export default function MenuView({
         ))}
 
       <h3>Dishes</h3>
+      <p>
+        <button className="secondary" onClick={() => setPreview('all')}>
+          🖨 Print all recipes
+        </button>
+      </p>
       <div className="menu-grid">
         {ordered.map((d) => (
           <Card

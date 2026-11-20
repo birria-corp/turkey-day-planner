@@ -15,6 +15,7 @@ import seed from './seed/seed-2025.json';
 import { shiftSeed } from './scheduler/seed.js';
 import { toEventDocs, validateImport } from './importer.js';
 import { buildShoppingList } from './shopping.js';
+import { track } from './saveStatus.js';
 
 const SUBS = ['meals', 'dishes', 'steps', 'shopping'];
 export const eventId = (year) => `thanksgiving-${year}`;
@@ -35,6 +36,11 @@ export async function fetchEventDetail(id) {
   return { meals, dishes, steps };
 }
 
+/** The shopping docs once (for backups). */
+export async function fetchShopping(id) {
+  return withId(await getDocs(collection(db, 'events', id, 'shopping')));
+}
+
 /** Delete an event and everything under it. Caller must confirm first. */
 export async function deleteEvent(id) {
   const batch = writeBatch(db);
@@ -43,7 +49,7 @@ export async function deleteEvent(id) {
     snap.docs.forEach((d) => batch.delete(d.ref));
   }
   batch.delete(doc(db, 'events', id));
-  await batch.commit();
+  await track(batch.commit());
 }
 
 /**
@@ -63,13 +69,14 @@ export async function loadSampleEvent(year, ownerUid) {
   s.meals.forEach((m) => put('meals', m));
   s.dishes.forEach((d) => put('dishes', d));
   s.steps.forEach((st) => put('steps', st));
-  await batch.commit();
+  await track(batch.commit());
   return id;
 }
 
 /**
- * Owner-only: replace an event with the contents of a menu file (meals, dishes with
- * recipes, steps, and a fresh shopping list). Caller must confirm first.
+ * Owner-only: replace an event with the contents of a menu file or a backup file (meals, dishes
+ * with recipes, steps, and a shopping list). A backup also restores the shopping ticks.
+ * Caller must confirm first.
  */
 export async function importEvent(data, ownerUid) {
   const errors = validateImport(data);
@@ -79,35 +86,38 @@ export async function importEvent(data, ownerUid) {
   const ref = doc(db, 'events', id);
   if ((await getDoc(ref)).exists()) await deleteEvent(id);
 
+  const state = data.shoppingState || {};
   const batch = writeBatch(db);
   batch.set(ref, { ...docs.event, ownerUid, createdAt: serverTimestamp() });
   const put = (sub, { id: docId, ...rest }) => batch.set(doc(db, 'events', id, sub, docId), rest);
   docs.meals.forEach((m) => put('meals', m));
   docs.dishes.forEach((d) => put('dishes', d));
   docs.steps.forEach((s) => put('steps', s));
-  docs.shopping.forEach((s) => put('shopping', { ...s, have: false, checked: false }));
-  await batch.commit();
+  docs.shopping.forEach((s) =>
+    put('shopping', { ...s, have: !!(state[s.id] && state[s.id].have), checked: !!(state[s.id] && state[s.id].checked) }),
+  );
+  await track(batch.commit());
   return id;
 }
 
 /** Assign a cook to a dish. Allowed for cooks and owner by the rules. */
 export function updateDishCook(id, dishId, cookName) {
-  return updateDoc(doc(db, 'events', id, 'dishes', dishId), { cookName });
+  return track(updateDoc(doc(db, 'events', id, 'dishes', dishId), { cookName }));
 }
 
 /** Change one step (start time, length, description, resource). Cooks and owner only, by the rules. */
 export function updateStep(id, stepId, patch) {
-  return updateDoc(doc(db, 'events', id, 'steps', stepId), patch);
+  return track(updateDoc(doc(db, 'events', id, 'steps', stepId), patch));
 }
 
 /** Add a step. Returns its new id. */
 export async function addStep(id, step) {
-  const ref = await addDoc(collection(db, 'events', id, 'steps'), step);
+  const ref = await track(addDoc(collection(db, 'events', id, 'steps'), step));
   return ref.id;
 }
 
 export function deleteStep(id, stepId) {
-  return deleteDoc(doc(db, 'events', id, 'steps', stepId));
+  return track(deleteDoc(doc(db, 'events', id, 'steps', stepId)));
 }
 
 /** Move a dinner: set its serve time and the new start times of its dishes' steps, all or nothing. */
@@ -115,12 +125,12 @@ export async function moveMeal(id, mealId, serveAt, patches) {
   const batch = writeBatch(db);
   batch.update(doc(db, 'events', id, 'meals', mealId), { serveAt });
   patches.forEach((p) => batch.update(doc(db, 'events', id, 'steps', p.id), { startAt: p.startAt }));
-  await batch.commit();
+  await track(batch.commit());
 }
 
 /** Change how many times a recipe is multiplied. Rebuild the shopping list afterwards. */
 export function updateDishScale(id, dishId, scale) {
-  return updateDoc(doc(db, 'events', id, 'dishes', dishId), { scale });
+  return track(updateDoc(doc(db, 'events', id, 'dishes', dishId), { scale }));
 }
 
 /** Live shopping list. Returns the unsubscribe function. */
@@ -130,7 +140,7 @@ export function subscribeShopping(id, onData, onError) {
 
 /** Tick "have it" (cooks, owner) or "in cart" (any member). */
 export function updateShoppingItem(id, itemId, patch) {
-  return updateDoc(doc(db, 'events', id, 'shopping', itemId), patch);
+  return track(updateDoc(doc(db, 'events', id, 'shopping', itemId), patch));
 }
 
 /** Recompute the list from the dishes, keeping each line's have/in-cart ticks. */
@@ -148,5 +158,5 @@ export async function rebuildShopping(id, dishes) {
     });
   });
   existing.filter((i) => !keep.has(i.id)).forEach((i) => batch.delete(doc(db, 'events', id, 'shopping', i.id)));
-  await batch.commit();
+  await track(batch.commit());
 }

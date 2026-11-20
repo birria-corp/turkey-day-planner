@@ -122,6 +122,14 @@ function fmtCount(qty, unit) {
   return `${fmtQty(qty)} ${word}`;
 }
 
+/** "1 1/2 tsp" and the ingredient name, with a dish's scale applied. */
+export function ingredientLine(ing, scale) {
+  const q = scaleQty(ing, scale);
+  if (q == null) return { amount: 'as needed', name: ing.name };
+  const unit = ing.unit ? (q > 1 && PLURAL[ing.unit] ? PLURAL[ing.unit] : ing.unit) : '';
+  return { amount: `${fmtQty(q)}${unit ? ` ${unit}` : ''}`, name: ing.name };
+}
+
 /** Stable Firestore-safe id for one list line. */
 export function shoppingId(name, family) {
   return `${name}--${family}`.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -193,6 +201,24 @@ function toBase(qty, unit) {
   if (unit in VOL) return qty * VOL[unit];
   if (unit in WT) return qty * WT[unit];
   return qty;
+}
+
+/**
+ * Plain text for Google Keep: an aisle heading line, then one item per line ("2 lb Brussels sprouts").
+ * No blank lines (each would become an empty checkbox). Items already ticked as "have" end with "(have)".
+ */
+export function buildKeepText(items) {
+  const lines = [];
+  for (const [aisle, groups] of groupByAisle(items)) {
+    lines.push(aisle.toUpperCase());
+    for (const [, list] of groups) {
+      for (const i of list) {
+        const asNeeded = i.qtyText === 'as needed';
+        lines.push(`${asNeeded ? '' : `${i.qtyText} `}${i.name}${asNeeded ? ' (as needed)' : ''}${i.have ? ' (have)' : ''}`);
+      }
+    }
+  }
+  return lines.join('\n');
 }
 
 /** [[aisle, [[group, items[]], ...]], ...] in store order, like items together. */

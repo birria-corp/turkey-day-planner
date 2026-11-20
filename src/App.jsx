@@ -2,10 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db, signIn, signOutUser, watchAuth, finishRedirect } from './firebase.js';
 import EventView from './EventView.jsx';
+import SaveStatus from './SaveStatus.jsx';
+import { pendingCount } from './saveStatus.js';
 
 // Same uid pinned in firestore.rules. A uid is not a secret; rules enforce access.
 const OWNER_UID = 'enVCX2fxmbMOHfPSOHcWBdvtgZi1';
-const VERSION = 'v0.8.1';
+const VERSION = 'v0.9.0';
 
 /**
  * Green header: "Turkey Day Planner - 2026" (the year of the dinner) with the version under it.
@@ -17,6 +19,7 @@ function Header({ user, role, year, settingsOpen, onToggleSettings }) {
       <div className="banner-left">
         <h1>Turkey Day Planner{year ? ` - ${year}` : ''}</h1>
         <div className="version">{VERSION}</div>
+        {user && <SaveStatus />}
       </div>
       {user && (
         <div className="banner-right">
@@ -58,6 +61,18 @@ export default function App() {
   useEffect(() => {
     finishRedirect().catch((e) => setError(e.message));
     return watchAuth(setUser);
+  }, []);
+
+  // Ask before closing the tab while a change has not reached Firebase yet.
+  useEffect(() => {
+    const warn = (e) => {
+      if (pendingCount() > 0) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
   }, []);
 
   // Look up this user's membership once signed in.

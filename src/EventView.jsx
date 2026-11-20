@@ -5,6 +5,7 @@ import {
   deleteStep,
   fetchEventDetail,
   fetchEvents,
+  fetchShopping,
   importEvent,
   loadSampleEvent,
   moveMeal,
@@ -12,6 +13,7 @@ import {
   updateDishScale,
   updateStep,
 } from './events.js';
+import { backupFilename, buildBackup, downloadJson } from './backup.js';
 import BlockCalendar from './BlockCalendar.jsx';
 import DayAgenda from './DayAgenda.jsx';
 import DinnerPanel from './DinnerPanel.jsx';
@@ -29,6 +31,7 @@ const SAMPLE_YEAR = 2026;
 const VIEW_KEY = 'tdp-view';
 const TAB_KEY = 'tdp-tab';
 const ROWS_KEY = 'tdp-rows';
+const BACKUP_KEY = 'tdp-last-backup';
 const ROW_HEIGHTS = { compact: 30, normal: 48, large: 64 };
 const RESOURCE_WORD = { oven: 'Oven', stovetop: 'Stovetop', smoker: 'Smoker' };
 const NARROW_PX = 820; // below this width the page is laid out for a phone
@@ -157,6 +160,13 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
   const [rows, setRows] = useState(() => readStored(ROWS_KEY, Object.keys(ROW_HEIGHTS), 'normal'));
   const [day, setDay] = useState(null);
   const [menuOpenId, setMenuOpenId] = useState(null);
+  const [lastBackup, setLastBackup] = useState(() => {
+    try {
+      return localStorage.getItem(BACKUP_KEY) || '';
+    } catch {
+      return '';
+    }
+  });
   const [dayWrap, setDayWrap] = useState(null);
   const dayWrapWidth = useElementWidth(dayWrap);
   const [error, setError] = useState('');
@@ -336,15 +346,62 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
     }
   }
 
+  // Download everything about the current event as a file on this device. Used by the Backup button
+  // and automatically before anything that replaces the event.
+  async function downloadBackup() {
+    const [fresh, shopping] = await Promise.all([fetchEventDetail(current.id), fetchShopping(current.id)]);
+    const now = new Date();
+    downloadJson(backupFilename(now, current.year), buildBackup(current, fresh, shopping, now));
+    store(BACKUP_KEY, now.toISOString());
+    setLastBackup(now.toISOString());
+  }
+
+  function backupNow() {
+    run(async () => {
+      await downloadBackup();
+    });
+  }
+
+  async function createErrand() {
+    const step = {
+      dishId: '',
+      kind: 'event',
+      text: 'Errand',
+      startAt: `${activeDay || (current && current.startDate)}T10:00`,
+      durationMin: 60,
+      resource: 'none',
+      anchor: 'fixed',
+    };
+    try {
+      const id = await addStep(current.id, step);
+      setDetail((d) => ({ ...d, steps: [...d.steps, { id, ...step }] }));
+      setError('');
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  // Print the Plan tab as it is on screen: scaled to fit one page, with the browser's print window.
+  function printPlan() {
+    const el = document.querySelector('.print-fit');
+    if (el) {
+      const landscape = view === 'week';
+      const z = Math.min(1, (landscape ? 1000 : 700) / el.scrollWidth, (landscape ? 640 : 960) / el.scrollHeight);
+      document.documentElement.style.setProperty('--print-zoom', String(z));
+    }
+    window.print();
+  }
+
   function replaceSample() {
     if (
       !window.confirm(
-        `Delete ${current.name} and reload the sample event? Cook assignments and any other edits will be lost.`,
+        `Delete ${current.name} and reload the sample event? Cook assignments and any other edits will be lost. A backup file downloads first.`,
       )
     ) {
       return;
     }
     run(async () => {
+      await downloadBackup();
       await deleteEvent(current.id);
       await loadSampleEvent(SAMPLE_YEAR, ownerUid);
     });
@@ -362,9 +419,10 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
         throw new Error('That file is not valid JSON.');
       }
       const year = data && data.event && data.event.year;
-      if (!window.confirm(`Replace the ${year} event with the contents of ${file.name}? Everything on that event, including cook picks, ticks and edits, is replaced.`)) {
+      if (!window.confirm(`Replace the ${year} event with the contents of ${file.name}? Everything on that event, including cook picks, ticks and edits, is replaced. A backup file of the current event downloads first.`)) {
         return;
       }
+      if (current) await downloadBackup();
       await importEvent(data, ownerUid);
     });
   }
@@ -378,10 +436,16 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
         current={current}
         detail={detail}
         busy={busy}
+        lastBackup={lastBackup}
+        errands={detail ? detail.steps.filter((s) => !s.dishId).sort((a, b) => (a.startAt < b.startAt ? -1 : 1)) : []}
         onClose={onCloseSettings}
+        onBackup={backupNow}
         onImportFile={importFile}
         onReplaceSample={replaceSample}
         onLoadSample={() => run(() => loadSampleEvent(SAMPLE_YEAR, ownerUid))}
+        onUpdateStep={patchStep}
+        onAddErrand={createErrand}
+        onDeleteStep={removeStep}
       />
     );
   }
@@ -431,7 +495,7 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
           <p className="muted dates-line">
             {fmtDayHeading(current.startDate)} to {fmtDayHeading(current.endDate)}
           </p>
-          <p>
+          <p className="no-print">
             {tabBtn('plan', 'Plan')}
             {tabBtn('menu', 'Menu')}
             {tabBtn('shopping', 'Shopping')}
@@ -442,7 +506,8 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
 
           {tab === 'plan' && (
             <>
-              <p className="toolbar">
+              <h1 className="print-only print-title">Turkey Day Planner{dinnerYear ? ` - ${dinnerYear}` : ''}</h1>
+              <p className="toolbar no-print">
                 <span>
                   {viewBtn('week', 'Week')}
                   {viewBtn('day', 'Day')}
@@ -459,6 +524,9 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
                   {KIND_MARKER.prep} prep &nbsp; {KIND_MARKER.assemble} assemble &nbsp; {KIND_MARKER.cook} cook &nbsp;{' '}
                   {KIND_MARKER.rest} rest &nbsp; {KIND_MARKER.event} errand
                 </span>
+                <button className="secondary" onClick={printPlan}>
+                  🖨 Print
+                </button>
               </p>
 
               {conflicts.length > 0 && view !== 'timeline' && (
@@ -479,7 +547,7 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
               )}
 
               {detail && view === 'week' && (
-                <div className="cal-wrap">
+                <div className="cal-wrap print-fit">
                   <BlockCalendar
                     {...calendarProps}
                     side={
@@ -497,7 +565,7 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
 
               {detail && view === 'day' && activeDay && (
                 <>
-                  <p className="daypick">
+                  <p className="daypick no-print">
                     <button
                       className="secondary"
                       disabled={dayIndex <= 0}
@@ -524,7 +592,7 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
                       →
                     </button>
                   </p>
-                  <div className="day-wrap" ref={setDayWrap}>
+                  <div className="day-wrap print-fit" ref={setDayWrap}>
                     <BlockCalendar
                       {...calendarProps}
                       rowH={dayRowH}

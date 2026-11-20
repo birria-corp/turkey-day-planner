@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { rebuildShopping, subscribeShopping, updateShoppingItem } from './events.js';
-import { groupByAisle } from './shopping.js';
+import { buildKeepText, groupByAisle } from './shopping.js';
+import { PrintShell, ShoppingPrint } from './PrintViews.jsx';
+import { canShare, copyText, shareText } from './clipboard.js';
 
 function Row({ item, checked, disabled, onToggle, label }) {
   return (
@@ -37,8 +39,25 @@ export default function ShoppingView({ eventId, dishes, canEdit }) {
   const [mode, setMode] = useState('pantry');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [preview, setPreview] = useState(null); // 'store' | 'full': print preview
+  const [note, setNote] = useState(''); // "Copied" feedback
 
   useEffect(() => subscribeShopping(eventId, setItems, (e) => setError(e.message)), [eventId]);
+
+  const flash = (text) => {
+    setNote(text);
+    setTimeout(() => setNote(''), 4000);
+  };
+
+  // The whole list, one item per line under aisle headings, ready to paste into Google Keep.
+  const copyForKeep = async () => {
+    const ok = await copyText(buildKeepText(items));
+    flash(ok ? 'Copied. Open Google Keep, start a new list or note and paste.' : 'Could not copy. Try the Share button or print instead.');
+  };
+  const shareToKeep = async () => {
+    const ok = await shareText('Thanksgiving shopping list', buildKeepText(items));
+    if (ok) flash('Shared. Choose Keep in the share sheet to save it as a note.');
+  };
 
   const guard = (fn) => async () => {
     try {
@@ -71,6 +90,17 @@ export default function ShoppingView({ eventId, dishes, canEdit }) {
   const need = items.filter((i) => !i.have);
   const inCart = need.filter((i) => i.checked);
 
+  if (preview) {
+    return (
+      <PrintShell
+        title={preview === 'store' ? 'Shopping list: still to buy' : 'Shopping list: everything'}
+        onClose={() => setPreview(null)}
+      >
+        <ShoppingPrint items={items} mode={preview} />
+      </PrintShell>
+    );
+  }
+
   return (
     <div>
       {error && <p className="error">{error}</p>}
@@ -86,6 +116,23 @@ export default function ShoppingView({ eventId, dishes, canEdit }) {
             Rebuild from recipes
           </button>
         )}
+      </p>
+      <p className="share-row">
+        <button className="secondary" onClick={copyForKeep}>
+          Copy for Google Keep
+        </button>
+        {canShare() && (
+          <button className="secondary" onClick={shareToKeep}>
+            Share…
+          </button>
+        )}
+        <button className="secondary" onClick={() => setPreview('store')}>
+          🖨 Print what's left
+        </button>
+        <button className="secondary" onClick={() => setPreview('full')}>
+          🖨 Print everything
+        </button>
+        {note && <span className="muted">{note}</span>}
       </p>
 
       {mode === 'pantry' ? (
