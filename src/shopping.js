@@ -167,8 +167,9 @@ export function buildShoppingList(dishes) {
     if (qty != null) {
       qtyText = i.family === 'vol' ? fmtVolume(qty) : i.family === 'wt' ? fmtWeight(qty) : fmtCount(qty, i.unit);
       // Butter is bought in sticks (1 stick = 8 tbsp = 24 tsp).
-      if (i.family === 'vol' && /\bbutter\b/i.test(i.name)) {
-        const sticks = qty / 24;
+      // Only plain butter: not peanut/apple butter. Round up to whole sticks.
+      if (i.family === 'vol' && /\bbutter\b/i.test(i.name) && !/\b(peanut|almond|apple|nut|cocoa|shea)\s+butter\b|buttermilk/i.test(i.name)) {
+        const sticks = Math.ceil(qty / 24 - 1e-9);
         qtyText = `${fmtQty(sticks)} ${sticks > 1 ? 'sticks' : 'stick'} (${fmtQty(qty / 3)} tbsp)`;
       }
     }
@@ -215,7 +216,8 @@ export function buildKeepText(items) {
     for (const [, list] of groups) {
       for (const i of list) {
         const asNeeded = i.qtyText === 'as needed';
-        lines.push(`${asNeeded ? '' : `${i.qtyText} `}${i.name}${asNeeded ? ' (as needed)' : ''}`);
+        const extra = [asNeeded ? 'as needed' : '', i.note || ''].filter(Boolean).join('; ');
+        lines.push(`${asNeeded ? '' : `${i.qtyText} `}${i.name}${extra ? ` (${extra})` : ''}`);
       }
     }
   }

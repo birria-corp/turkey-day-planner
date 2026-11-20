@@ -68,7 +68,7 @@ describe('buildShoppingList', () => {
 
   it('adds the same ingredient across dishes and units', () => {
     // 6*2 + 4 + 2*2 tbsp = 20 tbsp (60 tsp), plus 1*2 cups (96 tsp) = 156 tsp = 52 tbsp = 6 1/2 sticks
-    expect(byName['Unsalted butter'].qtyText).toBe('6 1/2 sticks (52 tbsp)');
+    expect(byName['Unsalted butter'].qtyText).toBe('7 sticks (52 tbsp)');
     expect(byName['Unsalted butter'].dishes).toEqual(['Mashed', 'Turkey', 'Gratin']);
   });
 

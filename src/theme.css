@@ -209,12 +209,12 @@ button.small { padding: 3px 8px; font-size: 13px; margin-right: 0; }
 }
 .block .b1 { font-size: 13px; font-weight: 700; line-height: 1.15; max-width: 100%; }
 .block .b2 { font-size: 12px; font-weight: 500; line-height: 1.15; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
-.block.step { cursor: pointer; }
+.block.step { cursor: pointer; z-index: 3; }
 .block.step.movable { cursor: grab; }
 .block.step.dragging { opacity: 0.35; }
 .block.step:focus-visible { outline: 3px solid #1d4ed8; outline-offset: 1px; z-index: 6; }
 .block.step.conflict { outline: 2px dashed #c0392b; outline-offset: -3px; }
-.block.serve { background: var(--mustard); color: #5a4300; letter-spacing: 0.03em; z-index: 2; }
+.block.serve { background: var(--mustard); color: #5a4300; letter-spacing: 0.03em; z-index: 1; pointer-events: none; }
 .ghost {
   position: absolute;
   left: 2px;

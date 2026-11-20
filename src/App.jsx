@@ -57,6 +57,8 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [eventYear, setEventYear] = useState(null); // year of the dinner, reported by the planner
   const [error, setError] = useState('');
+  const [memberFailed, setMemberFailed] = useState(false); // membership lookup failed (offline), not "not approved"
+  const [memberTry, setMemberTry] = useState(0); // bump to retry the lookup
 
   useEffect(() => {
     finishRedirect().catch((e) => setError(e.message));
@@ -87,10 +89,14 @@ export default function App() {
       setMember({ role: 'owner' });
       return;
     }
+    setMemberFailed(false);
     getDoc(doc(db, 'members', user.uid))
       .then((snap) => setMember(snap.exists() ? snap.data() : null))
-      .catch(() => setMember(null));
-  }, [user]);
+      .catch(() => {
+        setMember(null);
+        setMemberFailed(true);
+      });
+  }, [user, memberTry]);
 
   async function requestAccess() {
     try {
@@ -137,6 +143,13 @@ export default function App() {
           onCloseSettings={() => setSettingsOpen(false)}
           onEventYear={setEventYear}
         />
+      ) : memberFailed ? (
+        <>
+          <p className="error">Could not check your access. This is usually a weak connection, not a problem with your account.</p>
+          <p>
+            <button onClick={() => setMemberTry((n) => n + 1)}>Try again</button>
+          </p>
+        </>
       ) : (
         <>
           <p>You are not approved yet. Send this ID to Spencer, or request access:</p>

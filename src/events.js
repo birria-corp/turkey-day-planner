@@ -177,17 +177,18 @@ export function updateShoppingItem(id, itemId, patch) {
 
 /** Recompute the list from the dishes, keeping each line's have/in-cart ticks. */
 export async function rebuildShopping(id, dishes) {
+  // Never rebuild from an empty dish list (page still loading): it would wipe every tick.
+  if (!dishes || dishes.length === 0) throw new Error('Dishes have not loaded yet. Wait a moment and try again.');
   const existing = withId(await getDocs(collection(db, 'events', id, 'shopping')));
   const old = Object.fromEntries(existing.map((i) => [i.id, i]));
   const items = buildShoppingList(dishes);
   const keep = new Set(items.map((i) => i.id));
   const batch = writeBatch(db);
   items.forEach(({ id: itemId, family, ...item }) => {
-    batch.set(doc(db, 'events', id, 'shopping', itemId), {
-      ...item,
-      have: !!(old[itemId] && old[itemId].have),
-      checked: !!(old[itemId] && old[itemId].checked),
-    });
+    // Existing lines: merge and leave have/checked alone, so a tick made by someone else
+    // while this runs is not reverted. New lines start unticked.
+    const fresh = old[itemId] ? {} : { have: false, checked: false };
+    batch.set(doc(db, 'events', id, 'shopping', itemId), { ...item, ...fresh }, { merge: true });
   });
   existing.filter((i) => !keep.has(i.id)).forEach((i) => batch.delete(doc(db, 'events', id, 'shopping', i.id)));
   await track(batch.commit());

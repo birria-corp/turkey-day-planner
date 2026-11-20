@@ -51,11 +51,15 @@ export default function ShoppingView({ eventId, dishes, canEdit }) {
 
   // What is still to buy (not ticked "have"), one item per line under aisle headings, ready to paste into Google Keep.
   const copyForKeep = async () => {
-    const ok = await copyText(buildKeepText(items));
+    const text = buildKeepText(items);
+    if (!text) return flash('Nothing left to buy: every item is ticked as already at home.');
+    const ok = await copyText(text);
     flash(ok ? 'Copied. Open Google Keep, start a new list or note and paste.' : 'Could not copy. Try the Share button or print instead.');
   };
   const shareToKeep = async () => {
-    const ok = await shareText('Thanksgiving shopping list', buildKeepText(items));
+    const text = buildKeepText(items);
+    if (!text) return flash('Nothing left to buy: every item is ticked as already at home.');
+    const ok = await shareText('Thanksgiving shopping list', text);
     if (ok) flash('Shared. Choose Keep in the share sheet to save it as a note.');
   };
 
@@ -75,7 +79,9 @@ export default function ShoppingView({ eventId, dishes, canEdit }) {
     setBusy(false);
   };
 
-  if (items === null) return <p>Loading shopping list…</p>;
+  if (items === null) {
+    return error ? <p className="error">Could not load the shopping list: {error}. Check your connection and reload.</p> : <p>Loading shopping list…</p>;
+  }
 
   if (items.length === 0) {
     return (
