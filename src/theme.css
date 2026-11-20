@@ -275,6 +275,24 @@ button.small { padding: 3px 8px; font-size: 13px; margin-right: 0; }
   font-size: 14px;
 }
 .ag-item:hover:not(:disabled) { background: #f4ead2; }
+.ag-row { display: flex; align-items: stretch; background: var(--row-a); border-left: 6px solid var(--tan); border-bottom: 1px solid var(--border); }
+.ag-row .ag-item { border: 0; flex: 1; width: auto; }
+.ag-check { flex: none; align-self: center; margin: 0 4px 0 8px; transform: scale(1.5); }
+.ag-row.done { opacity: 0.55; }
+.ag-row.done .ag-item span { text-decoration: line-through; }
+
+/* Done steps on the grid and in the recipe pane */
+.block.done { opacity: 0.55; }
+.block.done .b1, .block.done .b2 { text-decoration: line-through; }
+.done-box { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; cursor: pointer; }
+.done-box input { transform: scale(1.3); }
+
+/* Cook list editor (Settings) */
+.cook-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.cook-chip { display: inline-flex; align-items: center; gap: 4px; background: var(--sage-light); border: 1px solid var(--border); border-radius: 14px; padding: 2px 4px 2px 12px; }
+.cook-chip .chip-x { margin: 0; padding: 0 8px; border: 0; background: transparent; color: var(--maple); font-size: 18px; line-height: 1.2; }
+.cook-chip .chip-x:hover:not(:disabled) { background: rgba(168, 67, 47, 0.15); }
+.cook-add { padding: 6px 8px; font: inherit; border: 1px solid var(--border); border-radius: 6px; }
 .ag-time { font-weight: 700; font-size: 13px; }
 .ag-total { font-size: 12px; }
 

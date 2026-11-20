@@ -2,7 +2,7 @@
 
 Plan Thanksgiving cooking backward from serve time: dinners, dishes, recipes, shopping list, and a day-by-day order of operations. Replaces the yearly Google Sheet.
 
-**Version:** 0.2.0
+**Version:** see `version.json` (also shown under the title in the app)
 **Live:** https://birria-corp.github.io/turkey-day-planner/ (after first deploy)
 
 ---
@@ -16,7 +16,11 @@ Plan Thanksgiving cooking backward from serve time: dinners, dishes, recipes, sh
 - Week grid and day-of order of operations, planned backward from serve time
 - Google sign-in, family sharing, live sync
 
-Built so far: scaffold and calendar helpers.
+Built so far: sign-in, access control, menu and recipes (imported from a private file, not stored in this repo), week/day/timeline grid with drag and drop, shopping list, printing, backups, live updates and an installable app. This file's feature list and file structure below are out of date; see the code for the current layout.
+
+## Credits
+
+- App icon: the roast-turkey silhouette is "Thanksgiving Turkey" by liftarn, from [Openclipart](https://openclipart.org/detail/319574/thanksgiving-turkey), released under the [CC0 1.0 public domain dedication](https://creativecommons.org/publicdomain/zero/1.0/). Recolored for this app. No credit is required; it is given as a courtesy.
 
 ---
 

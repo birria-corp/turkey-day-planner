@@ -73,6 +73,7 @@ export default function BlockCalendar({
         startAt: s.startAt,
         durationMin: s.durationMin,
         dishId: s.dishId,
+        done: !!s.done,
       });
     });
     const serveBlocks = meals.map((m) =>
@@ -364,7 +365,7 @@ export default function BlockCalendar({
                       role="button"
                       tabIndex={0}
                       aria-label={`${b.full}, ${fmtTime(b.startAt)} to ${fmtTime(addMinutes(b.startAt, b.durationMin))}${conflict ? ', oven conflict' : ''}`}
-                      className={`block step${compact ? ' compact' : ''}${conflict ? ' conflict' : ''}${drag && drag.stepId === b.stepId ? ' dragging' : ''}${canEdit ? ' movable' : ''}`}
+                      className={`block step${compact ? ' compact' : ''}${b.done ? ' done' : ''}${conflict ? ' conflict' : ''}${drag && drag.stepId === b.stepId ? ' dragging' : ''}${canEdit ? ' movable' : ''}`}
                       title={`${b.full}\n${fmtTime(b.startAt)} to ${fmtTime(addMinutes(b.startAt, b.durationMin))}${conflict ? '\nOven is over capacity here' : ''}`}
                       onPointerDown={(e) => startDrag(e, b)}
                       onClick={() => open(b)}
@@ -378,7 +379,10 @@ export default function BlockCalendar({
                         color: color.fg,
                       }}
                     >
-                      <div className="b1">{compact && b.line2 ? b.icons : b.line1}</div>
+                      <div className="b1">
+                        {b.done ? '✓ ' : ''}
+                        {compact && b.line2 ? b.icons : b.line1}
+                      </div>
                       {b.line2 && h >= 36 && <div className="b2">{b.line2}</div>}
                     </div>
                   );

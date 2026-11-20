@@ -3,7 +3,13 @@ import { backupFilename, buildBackup } from './backup.js';
 import { toEventDocs, validateImport } from './importer.js';
 import { buildKeepText, ingredientLine } from './shopping.js';
 
-const event = { name: 'Thanksgiving 2026', year: 2026, startDate: '2026-11-23', endDate: '2026-11-28' };
+const event = {
+  name: 'Thanksgiving 2026',
+  year: 2026,
+  startDate: '2026-11-23',
+  endDate: '2026-11-28',
+  cooks: ['AJ', 'Lauren', 'Baker', 'Spencer'],
+};
 const detail = {
   meals: [
     { id: 'sat', name: 'Saturday Dinner', serveAt: '2026-11-28T15:00' },
@@ -19,7 +25,7 @@ const detail = {
   ],
   steps: [
     { id: 'b', dishId: 'mash', kind: 'cook', text: 'Boil', startAt: '2026-11-26T13:10', durationMin: 45, resource: 'stovetop' },
-    { id: 'a', dishId: 'mash', kind: 'prep', text: 'Peel', startAt: '2026-11-26T12:30', durationMin: 40, resource: 'hands' },
+    { id: 'a', dishId: 'mash', kind: 'prep', text: 'Peel', startAt: '2026-11-26T12:30', durationMin: 40, resource: 'hands', done: true },
     { id: 'e', dishId: '', kind: 'event', text: 'Shopping', startAt: '2026-11-24T16:00', durationMin: 90, resource: 'none' },
   ],
 };
@@ -44,8 +50,17 @@ describe('buildBackup', () => {
 
   it('keeps edited block times and errands, in time order', () => {
     expect(b.steps.map((s) => s.text)).toEqual(['Peel', 'Boil']);
-    expect(b.steps[0]).toMatchObject({ dish: 'mash', kind: 'prep', startAt: '2026-11-26T12:30', durationMin: 40 });
-    expect(b.events_other).toEqual([{ text: 'Shopping', startAt: '2026-11-24T16:00', durationMin: 90 }]);
+    expect(b.steps[0]).toMatchObject({ dish: 'mash', kind: 'prep', startAt: '2026-11-26T12:30', durationMin: 40, done: true });
+    expect(b.steps[1].done).toBe(false);
+    expect(b.events_other).toEqual([{ text: 'Shopping', startAt: '2026-11-24T16:00', durationMin: 90, done: false }]);
+  });
+
+  it('keeps the cook list and done ticks through a restore', () => {
+    expect(b.event.cooks).toEqual(['AJ', 'Lauren', 'Baker', 'Spencer']);
+    const docs = toEventDocs(b);
+    expect(docs.event.cooks).toEqual(['AJ', 'Lauren', 'Baker', 'Spencer']);
+    expect(docs.steps.find((s) => s.text === 'Peel').done).toBe(true);
+    expect(docs.steps.find((s) => s.text === 'Boil').done).toBe(false);
   });
 
   it('records only the shopping ticks that are set', () => {

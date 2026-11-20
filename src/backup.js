@@ -37,10 +37,11 @@ export function buildBackup(event, detail, shopping = [], now = new Date()) {
       startAt: s.startAt,
       durationMin: s.durationMin,
       resource: s.resource || 'none',
+      done: !!s.done,
     }));
   const errands = sorted
     .filter((s) => !s.dishId)
-    .map((s) => ({ text: s.text, startAt: s.startAt, durationMin: s.durationMin }));
+    .map((s) => ({ text: s.text, startAt: s.startAt, durationMin: s.durationMin, done: !!s.done }));
 
   const shoppingState = {};
   shopping.forEach((i) => {
@@ -50,7 +51,13 @@ export function buildBackup(event, detail, shopping = [], now = new Date()) {
   return {
     _note: 'Turkey Day Planner backup. Restore with Settings > Import menu file. Keep this file private: it holds recipe text.',
     _backupAt: now.toISOString(),
-    event: { name: event.name, year: event.year, startDate: event.startDate, endDate: event.endDate },
+    event: {
+      name: event.name,
+      year: event.year,
+      startDate: event.startDate,
+      endDate: event.endDate,
+      ...(event.cooks ? { cooks: event.cooks } : {}),
+    },
     meals: [...detail.meals]
       .sort((a, b) => (a.serveAt < b.serveAt ? -1 : 1))
       .map((m) => ({ id: m.id, name: m.name, serveAt: m.serveAt })),

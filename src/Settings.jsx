@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Admin from './Admin.jsx';
 import { StepRow } from './MenuView.jsx';
 import { eventId } from './events.js';
@@ -14,6 +14,50 @@ const fmtBackup = (iso) => {
   }
 };
 
+/** The names in the cook dropdown: add a name, or remove one (dishes already given that name keep it). */
+function CooksEditor({ cooks, onSave, disabled }) {
+  const [name, setName] = useState('');
+  const add = () => {
+    const n = name.trim();
+    if (!n || cooks.includes(n)) return;
+    onSave([...cooks, n]);
+    setName('');
+  };
+  return (
+    <div>
+      <p className="cook-chips">
+        {cooks.map((c) => (
+          <span key={c} className="cook-chip">
+            {c}
+            <button
+              className="chip-x"
+              disabled={disabled}
+              onClick={() => onSave(cooks.filter((x) => x !== c))}
+              aria-label={`Remove ${c}`}
+              title={`Remove ${c}`}
+            >
+              ×
+            </button>
+          </span>
+        ))}
+      </p>
+      <p>
+        <input
+          className="cook-add"
+          value={name}
+          placeholder="Add a name"
+          disabled={disabled}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && add()}
+        />{' '}
+        <button className="secondary" disabled={disabled || !name.trim()} onClick={add}>
+          + Add
+        </button>
+      </p>
+    </div>
+  );
+}
+
 /** Owner-only settings: backup, who may use the app, errands, and the menu file tools. Opened from the gear in the header. */
 export default function Settings({
   ownerUid,
@@ -22,6 +66,8 @@ export default function Settings({
   busy,
   lastBackup,
   errands,
+  cooks,
+  onSaveCooks,
   onClose,
   onBackup,
   onImportFile,
@@ -54,6 +100,10 @@ export default function Settings({
         </button>{' '}
         <span className="muted">{fmtBackup(lastBackup)}</span>
       </p>
+
+      <h3>People who cook</h3>
+      <p className="muted">These names appear in the dinner column dropdown on the Plan tab.</p>
+      <CooksEditor cooks={cooks} onSave={onSaveCooks} disabled={!current} />
 
       <h3>Errands</h3>
       <p className="muted">Trips and tasks that aren’t tied to one dish (shopping, buying ice). Edit the time or remove them here.</p>

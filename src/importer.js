@@ -54,6 +54,7 @@ export function toEventDocs(data) {
     year: data.event.year,
     startDate: data.event.startDate,
     endDate: data.event.endDate,
+    ...(Array.isArray(data.event.cooks) ? { cooks: data.event.cooks } : {}),
   };
 
   const meals = data.meals.map((m) => ({ id: m.id, name: m.name, serveAt: m.serveAt }));
@@ -87,6 +88,7 @@ export function toEventDocs(data) {
     durationMin: s.durationMin,
     resource: s.resource || 'none',
     anchor: 'fixed',
+    done: !!s.done,
   }));
   const errands = (data.events_other || []).map((s) => ({
     dishId: '',
@@ -96,6 +98,7 @@ export function toEventDocs(data) {
     durationMin: s.durationMin,
     resource: 'none',
     anchor: 'fixed',
+    done: !!s.done,
   }));
   const steps = [...dishSteps, ...errands].map((s, i) => ({ id: `s${pad(i + 1)}`, ...s }));
 

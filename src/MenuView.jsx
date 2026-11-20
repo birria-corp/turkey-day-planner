@@ -70,6 +70,7 @@ export function StepRow({ step, canEdit, onUpdate, onDelete }) {
     return (
       <div className="menu-line">
         <span>
+          {step.done ? '✓ ' : ''}
           {KIND_MARKER[kind]} <strong>{KIND_NAME[kind]}</strong>: {step.text}
         </span>
         <span className="muted">
@@ -82,6 +83,9 @@ export function StepRow({ step, canEdit, onUpdate, onDelete }) {
   return (
     <div className="step-edit" style={{ borderLeftColor: 'var(--border)' }}>
       <div className="step-edit-top">
+        <label className="done-box">
+          <input type="checkbox" checked={!!step.done} onChange={() => onUpdate(step.id, { done: !step.done })} /> Done
+        </label>
         <span className="step-kind">
           {KIND_MARKER[kind]} {KIND_NAME[kind]}
         </span>

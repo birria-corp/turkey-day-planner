@@ -6,7 +6,7 @@ import { addMinutes, dayKey, fmtTime } from './scheduler/time.js';
  * Day view side panel: who does what today. One block per cook, then their steps in time order,
  * plus the dishes that have action items today and the serve times.
  */
-export default function DayAgenda({ day, steps, dishes, meals, colorOf, onOpenDish }) {
+export default function DayAgenda({ day, steps, dishes, meals, colorOf, onOpenDish, canEdit, onToggleDone }) {
   const { byCook, dishIds, serves } = useMemo(() => {
     const dishById = Object.fromEntries(dishes.map((d) => [d.id, d]));
     const today = steps
@@ -63,21 +63,26 @@ export default function DayAgenda({ day, steps, dishes, meals, colorOf, onOpenDi
           {items.map(({ step, dish }) => {
             const c = dish ? colorOf(dish.id) : colorOf('');
             return (
-              <button
-                key={step.id}
-                className="ag-item"
-                style={{ borderLeftColor: c.bg }}
-                onClick={() => dish && onOpenDish(dish.id)}
-              >
-                <span className="ag-time">
-                  {fmtTime(step.startAt)} – {fmtTime(addMinutes(step.startAt, step.durationMin))}
-                </span>
-                <span>
-                  {dish ? dish.emoji : ''} {KIND_MARKER[stepKind(step)]} {step.text}
-                  {dish && <span className="muted"> · {dish.title}</span>}
-                </span>
-                <span className="muted ag-total">{fmtDuration(step.durationMin)}</span>
-              </button>
+              <div key={step.id} className={`ag-row${step.done ? ' done' : ''}`} style={{ borderLeftColor: c.bg }}>
+                <input
+                  type="checkbox"
+                  className="ag-check"
+                  checked={!!step.done}
+                  disabled={!canEdit}
+                  onChange={() => onToggleDone(step)}
+                  aria-label={`Mark "${step.text}" done`}
+                />
+                <button className="ag-item" onClick={() => dish && onOpenDish(dish.id)}>
+                  <span className="ag-time">
+                    {fmtTime(step.startAt)} – {fmtTime(addMinutes(step.startAt, step.durationMin))}
+                  </span>
+                  <span>
+                    {dish ? dish.emoji : ''} {KIND_MARKER[stepKind(step)]} {step.text}
+                    {dish && <span className="muted"> · {dish.title}</span>}
+                  </span>
+                  <span className="muted ag-total">{fmtDuration(step.durationMin)}</span>
+                </button>
+              </div>
             );
           })}
         </div>

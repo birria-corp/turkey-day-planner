@@ -5,7 +5,7 @@ import { sortDishes } from './palette.js';
 export const COOK_CHOICES = ['AJ', 'Lauren', 'Baker', 'Spencer', 'Other family'];
 
 /** Far-right column: per meal, every dish with its cook. Cooks and owner can change cooks. */
-export default function DinnerPanel({ meals, dishes, colorOf, canEdit, onCookChange }) {
+export default function DinnerPanel({ meals, dishes, colorOf, canEdit, onCookChange, choices = COOK_CHOICES }) {
   const orderedMeals = [...meals].sort((a, b) => (a.serveAt < b.serveAt ? -1 : 1));
 
   return (
@@ -22,7 +22,7 @@ export default function DinnerPanel({ meals, dishes, colorOf, canEdit, onCookCha
             const c = colorOf(d.id);
             const current = d.cookName || '';
             // Keep any name already saved on the dish selectable, even if not in the list.
-            const options = current && !COOK_CHOICES.includes(current) ? [...COOK_CHOICES, current] : COOK_CHOICES;
+            const options = current && !choices.includes(current) ? [...choices, current] : choices;
             return (
               <div className="dinner-row" key={d.id}>
                 {canEdit ? (

@@ -36,6 +36,33 @@ export async function fetchEventDetail(id) {
   return { meals, dishes, steps };
 }
 
+/**
+ * Live meals, dishes and steps for one event: calls onData again whenever anyone changes anything
+ * (including the person's own edits, instantly). Returns the unsubscribe function.
+ */
+export function subscribeEventDetail(id, onData, onError) {
+  const state = { meals: null, dishes: null, steps: null };
+  const emit = () => {
+    if (state.meals && state.dishes && state.steps) onData({ ...state });
+  };
+  const stops = SUBS.slice(0, 3).map((sub) =>
+    onSnapshot(
+      collection(db, 'events', id, sub),
+      (snap) => {
+        state[sub] = withId(snap);
+        emit();
+      },
+      onError,
+    ),
+  );
+  return () => stops.forEach((stop) => stop());
+}
+
+/** The people who can be given a dish (the dropdown list). Owner only, by the rules. */
+export function updateEventCooks(id, cooks) {
+  return track(updateDoc(doc(db, 'events', id), { cooks }));
+}
+
 /** The shopping docs once (for backups). */
 export async function fetchShopping(id) {
   return withId(await getDocs(collection(db, 'events', id, 'shopping')));

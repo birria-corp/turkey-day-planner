@@ -10,6 +10,8 @@ import {
   importEvent,
   loadSampleEvent,
   moveMeal,
+  subscribeEventDetail,
+  updateEventCooks,
   updateDishCook,
   updateDishNotes,
   updateDishScale,
@@ -18,7 +20,7 @@ import {
 import { backupFilename, buildBackup, downloadJson } from './backup.js';
 import BlockCalendar from './BlockCalendar.jsx';
 import DayAgenda from './DayAgenda.jsx';
-import DinnerPanel from './DinnerPanel.jsx';
+import DinnerPanel, { COOK_CHOICES } from './DinnerPanel.jsx';
 import MenuView from './MenuView.jsx';
 import Settings from './Settings.jsx';
 import ShoppingView from './ShoppingView.jsx';
@@ -104,7 +106,7 @@ function Timeline({ meals, dishes, steps, colorOf }) {
       key: `step-${s.id}`,
       at: s.startAt,
       kind: 'step',
-      label: stepLabel(s, dishById[s.dishId]),
+      label: `${s.done ? '✓ ' : ''}${stepLabel(s, dishById[s.dishId])}`,
       when: `${fmtTime(s.startAt)} – ${fmtTime(addMinutes(s.startAt, s.durationMin))}`,
       dish: dishById[s.dishId],
       dishId: s.dishId,
@@ -194,6 +196,20 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
   }, [load]);
 
   const current = events ? events[0] : undefined;
+
+  // Live updates: when anyone changes a block, cook, dinner time or note, this screen follows at once.
+  const currentId = current ? current.id : null;
+  useEffect(() => {
+    if (!currentId) return undefined;
+    return subscribeEventDetail(
+      currentId,
+      (d) => setDetail(d),
+      (e) => setError(e.message),
+    );
+  }, [currentId]);
+
+  // The names in the cook dropdown: saved on the event, else the built-in list.
+  const cookChoices = (current && current.cooks) || COOK_CHOICES;
 
   // dishId -> swatch. A dish's saved `color` is a palette key. Errands fall back to the event color.
   const colorOf = useMemo(() => {
@@ -410,6 +426,22 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
     window.print();
   }
 
+  async function saveCooks(cooks) {
+    setEvents((list) => list.map((e) => (e.id === current.id ? { ...e, cooks } : e)));
+    try {
+      await updateEventCooks(current.id, cooks);
+      setError('');
+    } catch (e) {
+      setError(e.message);
+      load();
+    }
+  }
+
+  // Tick a step done (or undo it). Cooks and owner only, like every step edit.
+  function toggleDone(step) {
+    patchStep(step.id, { done: !step.done });
+  }
+
   async function changeNotes(dishId, myNotes) {
     try {
       await updateDishNotes(current.id, dishId, myNotes);
@@ -468,6 +500,8 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
         detail={detail}
         busy={busy}
         lastBackup={lastBackup}
+        cooks={cookChoices}
+        onSaveCooks={saveCooks}
         errands={detail ? detail.steps.filter((s) => !s.dishId).sort((a, b) => (a.startAt < b.startAt ? -1 : 1)) : []}
         onClose={onCloseSettings}
         onBackup={backupNow}
@@ -591,6 +625,7 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
                         colorOf={colorOf}
                         canEdit={canEdit}
                         onCookChange={changeCook}
+                        choices={cookChoices}
                       />
                     }
                   />
@@ -641,6 +676,8 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
                       meals={detail.meals}
                       colorOf={colorOf}
                       onOpenDish={openDish}
+                      canEdit={canEdit}
+                      onToggleDone={toggleDone}
                     />
                   </div>
                 </>
