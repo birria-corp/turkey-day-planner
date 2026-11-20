@@ -42,8 +42,9 @@ export function shiftSeed(seed, year) {
     serveAt: shiftStamp(m.serveAt, offset),
   }));
 
-  const dishes = seed.dishes.map((d) => ({
+  const dishes = seed.dishes.map((d, i) => ({
     id: d.id,
+    order: i,
     mealId: d.meal,
     recipeId: null,
     title: d.title,

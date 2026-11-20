@@ -2,9 +2,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { collection, deleteDoc, doc, getDocs, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebase.js';
 
-const btn = { padding: '8px 12px', fontSize: 15, borderRadius: 6, border: '1px solid #888', cursor: 'pointer', marginRight: 6 };
-const card = { border: '1px solid #ccc', borderRadius: 8, padding: 12, marginBottom: 10 };
-
 /** Owner-only panel: approve access requests, set cook/viewer, remove members. */
 export default function Admin({ ownerUid }) {
   const [requests, setRequests] = useState([]);
@@ -61,35 +58,35 @@ export default function Admin({ ownerUid }) {
   return (
     <section>
       <h2>Admin</h2>
-      {error && <p style={{ color: 'crimson' }}>{error}</p>}
+      {error && <p className="error">{error}</p>}
 
       <h3>Access requests ({requests.length})</h3>
-      {requests.length === 0 && <p style={{ color: '#666' }}>No pending requests.</p>}
+      {requests.length === 0 && <p className="muted">No pending requests.</p>}
       {requests.map((r) => (
-        <div key={r.uid} style={card}>
+        <div key={r.uid} className="card">
           <strong>{r.name || '(no name)'}</strong>
-          <div style={{ color: '#666', fontSize: 14 }}>{r.email}</div>
-          <div style={{ marginTop: 8 }}>
-            <button style={btn} disabled={busy} onClick={() => approve(r, 'cook')}>Approve as cook</button>
-            <button style={btn} disabled={busy} onClick={() => approve(r, 'viewer')}>Approve as viewer</button>
-            <button style={btn} disabled={busy} onClick={() => deny(r)}>Deny</button>
+          <div className="sub">{r.email}</div>
+          <div className="actions">
+            <button disabled={busy} onClick={() => approve(r, 'cook')}>Approve as cook</button>
+            <button disabled={busy} onClick={() => approve(r, 'viewer')}>Approve as viewer</button>
+            <button className="secondary" disabled={busy} onClick={() => deny(r)}>Deny</button>
           </div>
         </div>
       ))}
 
       <h3>Family members ({members.length})</h3>
-      {members.length === 0 && <p style={{ color: '#666' }}>No members yet.</p>}
+      {members.length === 0 && <p className="muted">No members yet.</p>}
       {members.map((m) => (
-        <div key={m.uid} style={card}>
-          <strong>{m.name || m.uid}</strong> <span style={{ color: '#666' }}>({m.role})</span>
-          <div style={{ marginTop: 8 }}>
-            {m.role !== 'cook' && <button style={btn} disabled={busy} onClick={() => setRole(m, 'cook')}>Make cook</button>}
-            {m.role !== 'viewer' && <button style={btn} disabled={busy} onClick={() => setRole(m, 'viewer')}>Make viewer</button>}
-            <button style={btn} disabled={busy} onClick={() => remove(m)}>Remove</button>
+        <div key={m.uid} className="card">
+          <strong>{m.name || m.uid}</strong> <span className="muted">({m.role})</span>
+          <div className="actions">
+            {m.role !== 'cook' && <button disabled={busy} onClick={() => setRole(m, 'cook')}>Make cook</button>}
+            {m.role !== 'viewer' && <button disabled={busy} onClick={() => setRole(m, 'viewer')}>Make viewer</button>}
+            <button className="secondary" disabled={busy} onClick={() => remove(m)}>Remove</button>
           </div>
         </div>
       ))}
-      <p><button style={btn} disabled={busy} onClick={load}>Refresh</button></p>
+      <p><button className="secondary" disabled={busy} onClick={load}>Refresh</button></p>
     </section>
   );
 }

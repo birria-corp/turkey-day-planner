@@ -1,5 +1,5 @@
 {
-  "_note": "Seed from 'Thanksgiving 2025 - Daily schedule.pdf'. Spencer verified 11/20 (turkey-thu split into oven 11:30-13:00 + rest 13:00-15:00; oven capacity 2). No ingredients, temps or recipes. Dates are real 2025 calendar days (Thanksgiving = 2025-11-27).",
+  "_note": "Seed from 'Thanksgiving 2025 - Daily schedule.pdf'. Spencer verified 11/20 (turkey-thu split into oven 11:30-13:00 + rest 13:00-14:30 to match the sheet; to be refined with the 2026 menu; oven capacity 2). No ingredients, temps or recipes. Dates are real 2025 calendar days (Thanksgiving = 2025-11-27).",
   "event": {
     "name": "Thanksgiving 2025",
     "year": 2025,
@@ -28,7 +28,7 @@
     { "dish": "turkey-thu", "text": "Turkey in brine", "startAt": "2025-11-25T19:00", "durationMin": 30, "resource": "fridge", "anchor": "fixed" },
     { "dish": "turkey-thu", "text": "Turkey out, dry, spatchcock", "startAt": "2025-11-26T11:30", "durationMin": 30, "resource": "hands", "anchor": "fixed" },
     { "dish": "turkey-thu", "text": "Turkey in oven", "startAt": "2025-11-27T11:30", "durationMin": 90, "resource": "oven", "anchor": "fixed" },
-    { "dish": "turkey-thu", "text": "Turkey rests", "startAt": "2025-11-27T13:00", "durationMin": 120, "resource": "none", "anchor": "fixed" },
+    { "dish": "turkey-thu", "text": "Turkey rests", "startAt": "2025-11-27T13:00", "durationMin": 90, "resource": "none", "anchor": "fixed" },
 
     { "dish": "stuffing", "text": "Cook cornbread", "startAt": "2025-11-25T18:00", "durationMin": 30, "resource": "oven", "anchor": "fixed" },
     { "dish": "stuffing", "text": "Cornbread stuffing", "startAt": "2025-11-27T13:00", "durationMin": 30, "resource": "oven", "anchor": "fixed" },

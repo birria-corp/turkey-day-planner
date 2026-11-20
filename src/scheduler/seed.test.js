@@ -45,11 +45,16 @@ describe('seed shifting', () => {
     expect(ids[0]).toBe('s01');
   });
 
-  it('splits Thursday turkey: oven ends where the rest starts and the rest ends at serve time', () => {
+  it('splits Thursday turkey: oven ends where the rest starts, rest ends 2:30 PM (sheet)', () => {
     const oven = s.steps.find((x) => x.text === 'Turkey in oven');
     const rest = s.steps.find((x) => x.text === 'Turkey rests');
     expect(addMinutes(oven.startAt, oven.durationMin)).toBe(rest.startAt);
-    expect(addMinutes(rest.startAt, rest.durationMin)).toBe(s.meals.find((m) => m.id === 'thu').serveAt);
+    expect(addMinutes(rest.startAt, rest.durationMin)).toBe('2026-11-26T14:30');
+  });
+
+  it('gives dishes a display order matching the sheet', () => {
+    expect(s.dishes[0]).toMatchObject({ id: 'mashed', order: 0 });
+    expect(s.dishes.map((d) => d.order)).toEqual(s.dishes.map((_, i) => i));
   });
 });
 

@@ -7,24 +7,21 @@ import EventView from './EventView.jsx';
 
 // Same uid pinned in firestore.rules. A uid is not a secret; rules enforce access.
 const OWNER_UID = 'enVCX2fxmbMOHfPSOHcWBdvtgZi1';
-const VERSION = 'v0.4.0';
+const VERSION = 'v0.5.0';
 
 const fmt = (d) =>
   d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-
-const page = { fontFamily: 'system-ui, sans-serif', padding: 16, maxWidth: 640, margin: '0 auto' };
-const btn = { padding: '10px 16px', fontSize: 16, borderRadius: 6, border: '1px solid #888', cursor: 'pointer' };
 
 function Header() {
   const year = new Date().getFullYear();
   const t = thanksgivingDate(year);
   const { start, end } = eventRange(year);
   return (
-    <>
+    <header className="banner">
       <h1>Turkey Day Planner</h1>
       <p>Thanksgiving {year}: {fmt(t)}</p>
       <p>Default planning week: {fmt(start)} to {fmt(end)}</p>
-    </>
+    </header>
   );
 }
 
@@ -69,30 +66,32 @@ export default function App() {
   }
 
   if (user === undefined) {
-    return <main style={page}><p>Loading…</p></main>;
+    return <main className="page"><p>Loading…</p></main>;
   }
 
   if (user === null) {
     return (
-      <main style={page}>
+      <main className="page">
         <Header />
-        <button style={btn} onClick={() => signIn().catch((e) => setError(e.message))}>
-          Sign in with Google
-        </button>
-        {error && <p style={{ color: 'crimson' }}>{error}</p>}
-        <p style={{ color: '#666' }}>{VERSION}</p>
+        <button onClick={() => signIn().catch((e) => setError(e.message))}>Sign in with Google</button>
+        {error && <p className="error">{error}</p>}
+        <p className="muted">{VERSION}</p>
       </main>
     );
   }
 
   return (
-    <main style={page}>
+    <main className={member ? 'page wide' : 'page'}>
       <Header />
       <p>Signed in as <strong>{user.displayName}</strong></p>
       {member ? (
         <>
           <p>Access: <strong>{member.role}</strong></p>
-          <EventView isOwner={member.role === 'owner'} ownerUid={OWNER_UID} />
+          <EventView
+            isOwner={member.role === 'owner'}
+            canEdit={member.role === 'owner' || member.role === 'cook'}
+            ownerUid={OWNER_UID}
+          />
           {member.role === 'owner' && <Admin ownerUid={OWNER_UID} />}
         </>
       ) : (
@@ -100,15 +99,15 @@ export default function App() {
           <p>You are not approved yet. Send this ID to Spencer, or request access:</p>
           <code style={{ wordBreak: 'break-all' }}>{user.uid}</code>
           <p>
-            <button style={btn} onClick={requestAccess} disabled={requested}>
+            <button onClick={requestAccess} disabled={requested}>
               {requested ? 'Request sent' : 'Request access'}
             </button>
           </p>
         </>
       )}
-      <p><button style={btn} onClick={() => signOutUser()}>Sign out</button></p>
-      {error && <p style={{ color: 'crimson' }}>{error}</p>}
-      <p style={{ color: '#666' }}>{VERSION}</p>
+      <p><button className="secondary" onClick={() => signOutUser()}>Sign out</button></p>
+      {error && <p className="error">{error}</p>}
+      <p className="muted">{VERSION}</p>
     </main>
   );
 }
