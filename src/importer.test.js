@@ -95,6 +95,8 @@ describe('labels', () => {
     expect(t({ dishId: 'a', kind: 'rest', text: 'Rest', resource: 'none' }).line1).toBe('🦃 ⏲️ Rest');
     expect(blockText({ dishId: '', kind: 'event', text: 'Shopping' }, undefined)).toMatchObject({ line1: '🛒 Shopping', line2: '' });
     expect(t({ dishId: 'a', kind: 'cook', text: 'Roast', resource: 'oven' }).full).toBe('🦃 🔥 Roast');
+    expect(t({ dishId: 'a', kind: 'cook', text: 'Roast', resource: 'oven' }).icons).toBe('🦃 🔥');
+    expect(blockText({ dishId: '', kind: 'event', text: 'Shopping' }, undefined).icons).toBe('🛒');
   });
   it('puts steps in the Prep & Assemble, Stovetop or Oven lane', () => {
     expect(laneOf({ dishId: 'a', kind: 'prep', resource: 'hands' })).toBe('prep');

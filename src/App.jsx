@@ -2,25 +2,54 @@ import React, { useEffect, useState } from 'react';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db, signIn, signOutUser, watchAuth, finishRedirect } from './firebase.js';
 import { thanksgivingDate, eventRange } from './scheduler/dates.js';
-import Admin from './Admin.jsx';
 import EventView from './EventView.jsx';
 
 // Same uid pinned in firestore.rules. A uid is not a secret; rules enforce access.
 const OWNER_UID = 'enVCX2fxmbMOHfPSOHcWBdvtgZi1';
-const VERSION = 'v0.7.1';
+const VERSION = 'v0.8.0';
 
 const fmt = (d) =>
   d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
-function Header() {
+/** Green header: title and version on the left; who is signed in, role, settings gear and sign out on the right. */
+function Header({ user, role, settingsOpen, onToggleSettings }) {
   const year = new Date().getFullYear();
   const t = thanksgivingDate(year);
   const { start, end } = eventRange(year);
   return (
     <header className="banner">
-      <h1>Turkey Day Planner</h1>
-      <p>Thanksgiving {year}: {fmt(t)}</p>
-      <p>Default planning week: {fmt(start)} to {fmt(end)}</p>
+      <div className="banner-left">
+        <h1>Turkey Day Planner</h1>
+        <div className="version">{VERSION}</div>
+        <p>Thanksgiving {year}: {fmt(t)}</p>
+        <p>Default planning week: {fmt(start)} to {fmt(end)}</p>
+      </div>
+      {user && (
+        <div className="banner-right">
+          <div className="who">
+            Signed in as <strong>{user.displayName}</strong>
+            {role && (
+              <>
+                <br />
+                Access: <strong>{role}</strong>
+              </>
+            )}
+          </div>
+          {role === 'owner' && (
+            <button
+              className={`icon-btn${settingsOpen ? ' active' : ''}`}
+              onClick={onToggleSettings}
+              aria-label="Settings"
+              title="Settings"
+            >
+              ⚙️
+            </button>
+          )}
+          <button className="ghost" onClick={() => signOutUser()}>
+            Sign out
+          </button>
+        </div>
+      )}
     </header>
   );
 }
@@ -29,6 +58,7 @@ export default function App() {
   const [user, setUser] = useState(undefined); // undefined = loading, null = signed out
   const [member, setMember] = useState(undefined); // undefined = unknown, null = not approved, object = approved
   const [requested, setRequested] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -41,6 +71,7 @@ export default function App() {
     if (!user) {
       setMember(undefined);
       setRequested(false);
+      setSettingsOpen(false);
       return;
     }
     if (user.uid === OWNER_UID) {
@@ -75,25 +106,26 @@ export default function App() {
         <Header />
         <button onClick={() => signIn().catch((e) => setError(e.message))}>Sign in with Google</button>
         {error && <p className="error">{error}</p>}
-        <p className="muted">{VERSION}</p>
       </main>
     );
   }
 
   return (
     <main className={member ? 'page wide' : 'page'}>
-      <Header />
-      <p>Signed in as <strong>{user.displayName}</strong></p>
+      <Header
+        user={user}
+        role={member ? member.role : ''}
+        settingsOpen={settingsOpen}
+        onToggleSettings={() => setSettingsOpen((v) => !v)}
+      />
       {member ? (
-        <>
-          <p>Access: <strong>{member.role}</strong></p>
-          <EventView
-            isOwner={member.role === 'owner'}
-            canEdit={member.role === 'owner' || member.role === 'cook'}
-            ownerUid={OWNER_UID}
-          />
-          {member.role === 'owner' && <Admin ownerUid={OWNER_UID} />}
-        </>
+        <EventView
+          isOwner={member.role === 'owner'}
+          canEdit={member.role === 'owner' || member.role === 'cook'}
+          ownerUid={OWNER_UID}
+          settingsOpen={settingsOpen}
+          onCloseSettings={() => setSettingsOpen(false)}
+        />
       ) : (
         <>
           <p>You are not approved yet. Send this ID to Spencer, or request access:</p>
@@ -105,9 +137,7 @@ export default function App() {
           </p>
         </>
       )}
-      <p><button className="secondary" onClick={() => signOutUser()}>Sign out</button></p>
       {error && <p className="error">{error}</p>}
-      <p className="muted">{VERSION}</p>
     </main>
   );
 }

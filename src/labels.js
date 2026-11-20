@@ -34,16 +34,19 @@ const APPLIANCE = { oven: 'Oven', stovetop: 'Stovetop', smoker: 'Smoker', fridge
 
 /**
  * Text for a grid block. line1: "🦃 🔥 Cook · Oven". line2: the dish name ("Turkey with Gravy").
- * Errands keep their own text. `full` is the whole description for hover text.
+ * Errands keep their own text. `icons` is just the emoji and marker (for very narrow blocks).
+ * `full` is the whole description for hover text.
  */
 export function blockText(step, dish) {
   const kind = stepKind(step);
   const full = stepLabel(step, dish);
-  if (kind === 'event') return { line1: `${KIND_MARKER.event} ${step.text}`, line2: '', full };
+  if (kind === 'event') return { line1: `${KIND_MARKER.event} ${step.text}`, icons: KIND_MARKER.event, line2: '', full };
   const appliance = kind === 'cook' ? APPLIANCE[step.resource] : '';
   const word = appliance ? `${KIND_NAME[kind]} · ${appliance}` : KIND_NAME[kind];
+  const icons = [dish && dish.emoji, KIND_MARKER[kind]].filter(Boolean).join(' ');
   return {
-    line1: [dish && dish.emoji, KIND_MARKER[kind], word].filter(Boolean).join(' '),
+    line1: [icons, word].filter(Boolean).join(' '),
+    icons, // emoji + marker only, for blocks too narrow for words
     line2: dish ? dish.title : '',
     full,
   };

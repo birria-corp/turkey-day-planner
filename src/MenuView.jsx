@@ -1,8 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { KIND_MARKER, KIND_NAME, RESOURCE_NAME, fmtDuration, fmtRange, stepKind } from './labels.js';
 import { fmtQty, scaleQty } from './shopping.js';
 import { sortDishes } from './palette.js';
-import { addMinutes, diffMinutes } from './scheduler/time.js';
+import { addMinutes, diffMinutes, fmtWhen } from './scheduler/time.js';
+import { describeDelta, planMealMove } from './scheduler/meal.js';
 
 const PLURAL = { clove: 'cloves', stalk: 'stalks', sprig: 'sprigs', can: 'cans', box: 'boxes', head: 'heads', bunch: 'bunches', handful: 'handfuls', inch: 'inches' };
 const STAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
@@ -261,6 +262,48 @@ function Detail({ dish, meal, steps, color, canEdit, onScaleChange, onUpdateStep
   );
 }
 
+/** One dinner: its current date and time, and a field to move it (with all its dishes' blocks). */
+function DinnerRow({ meal, dishes, steps, canEdit, onMoveMeal }) {
+  const [value, setValue] = useState(meal.serveAt);
+  const plan = planMealMove(meal, STAMP.test(value) ? value : meal.serveAt, dishes, steps);
+
+  function move() {
+    if (!STAMP.test(value) || plan.delta === 0) return;
+    const names = plan.dishes.map((d) => d.title).join(', ');
+    const ok = window.confirm(
+      `Move ${meal.name} from ${fmtWhen(meal.serveAt)} to ${fmtWhen(value)} (${describeDelta(plan.delta)})?\n\n` +
+        `This shifts ${plan.patches.length} Prep, Assemble and Cook blocks for: ${names}.\n` +
+        'Errands such as the shopping trip stay where they are.',
+    );
+    if (ok) onMoveMeal(meal, value);
+  }
+
+  return (
+    <div className="dinner-row-edit">
+      <div>
+        <strong>{meal.name}</strong>
+        <div className="muted">{fmtWhen(meal.serveAt)}</div>
+        <div className="muted small-note">{plan.dishes.length} dishes · {steps.filter((s) => plan.dishes.some((d) => d.id === s.dishId)).length} blocks move with it</div>
+      </div>
+      {canEdit && (
+        <div className="dinner-move">
+          <input
+            type="datetime-local"
+            step="900"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            aria-label={`New date and time for ${meal.name}`}
+          />
+          <button disabled={!STAMP.test(value) || plan.delta === 0} onClick={move}>
+            Move dinner
+          </button>
+          {plan.delta !== 0 && STAMP.test(value) && <span className="muted">{describeDelta(plan.delta)}</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Menu tab: one card per dish; click a card (or a block on the grid) for the full recipe and its schedule. */
 export default function MenuView({
   dishes,
@@ -274,6 +317,7 @@ export default function MenuView({
   onUpdateStep,
   onAddStep,
   onDeleteStep,
+  onMoveMeal,
 }) {
   const mealById = useMemo(() => Object.fromEntries(meals.map((m) => [m.id, m])), [meals]);
 
@@ -301,17 +345,38 @@ export default function MenuView({
   }
 
   return (
-    <div className="menu-grid">
-      {ordered.map((d) => (
-        <Card
-          key={d.id}
-          dish={d}
-          meal={mealById[d.mealId]}
-          steps={steps}
-          color={colorOf(d.id)}
-          onOpen={() => onOpenChange(d.id)}
-        />
-      ))}
+    <div>
+      <h3>Dinner date and time</h3>
+      <p className="muted">
+        Move a dinner and every Prep, Assemble and Cook block of its dishes moves with it. Errands such as the
+        shopping trip stay put.
+      </p>
+      {[...meals]
+        .sort((a, b) => (a.serveAt < b.serveAt ? -1 : 1))
+        .map((m) => (
+          <DinnerRow
+            key={`${m.id}-${m.serveAt}`}
+            meal={m}
+            dishes={dishes}
+            steps={steps}
+            canEdit={canEdit}
+            onMoveMeal={onMoveMeal}
+          />
+        ))}
+
+      <h3>Dishes</h3>
+      <div className="menu-grid">
+        {ordered.map((d) => (
+          <Card
+            key={d.id}
+            dish={d}
+            meal={mealById[d.mealId]}
+            steps={steps}
+            color={colorOf(d.id)}
+            onOpen={() => onOpenChange(d.id)}
+          />
+        ))}
+      </div>
     </div>
   );
 }

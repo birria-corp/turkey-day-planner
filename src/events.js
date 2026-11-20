@@ -110,6 +110,14 @@ export function deleteStep(id, stepId) {
   return deleteDoc(doc(db, 'events', id, 'steps', stepId));
 }
 
+/** Move a dinner: set its serve time and the new start times of its dishes' steps, all or nothing. */
+export async function moveMeal(id, mealId, serveAt, patches) {
+  const batch = writeBatch(db);
+  batch.update(doc(db, 'events', id, 'meals', mealId), { serveAt });
+  patches.forEach((p) => batch.update(doc(db, 'events', id, 'steps', p.id), { startAt: p.startAt }));
+  await batch.commit();
+}
+
 /** Change how many times a recipe is multiplied. Rebuild the shopping list afterwards. */
 export function updateDishScale(id, dishId, scale) {
   return updateDoc(doc(db, 'events', id, 'dishes', dishId), { scale });

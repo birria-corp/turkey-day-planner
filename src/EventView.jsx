@@ -3,11 +3,11 @@ import {
   addStep,
   deleteEvent,
   deleteStep,
-  eventId,
   fetchEventDetail,
   fetchEvents,
   importEvent,
   loadSampleEvent,
+  moveMeal,
   updateDishCook,
   updateDishScale,
   updateStep,
@@ -16,11 +16,13 @@ import BlockCalendar from './BlockCalendar.jsx';
 import DayAgenda from './DayAgenda.jsx';
 import DinnerPanel from './DinnerPanel.jsx';
 import MenuView from './MenuView.jsx';
+import Settings from './Settings.jsx';
 import ShoppingView from './ShoppingView.jsx';
 import { EVENT_COLOR, dishColor, sortDishes } from './palette.js';
 import { KIND_MARKER, KIND_NAME, blockText, stepLabel } from './labels.js';
 import { daysInRange } from './scheduler/dates.js';
 import { findConflicts } from './scheduler/conflicts.js';
+import { planMealMove } from './scheduler/meal.js';
 import { addMinutes, dayKey, fmtDayHeading, fmtTime } from './scheduler/time.js';
 
 const SAMPLE_YEAR = 2026;
@@ -29,6 +31,8 @@ const TAB_KEY = 'tdp-tab';
 const ROWS_KEY = 'tdp-rows';
 const ROW_HEIGHTS = { compact: 30, normal: 48, large: 64 };
 const RESOURCE_WORD = { oven: 'Oven', stovetop: 'Stovetop', smoker: 'Smoker' };
+const NARROW_PX = 820; // below this width the page is laid out for a phone
+const PHONE_GUTTER = 56; // time labels column on a phone (keep in sync with theme.css)
 
 function readStored(key, allowed, fallback) {
   try {
@@ -54,6 +58,35 @@ const parseKey = (key) => {
 
 const shortDay = (key) =>
   parseKey(key).toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
+
+/** True on a phone-sized screen. */
+function useNarrow() {
+  const query = `(max-width: ${NARROW_PX}px)`;
+  const [narrow, setNarrow] = useState(() => (typeof window !== 'undefined' && window.matchMedia ? window.matchMedia(query).matches : false));
+  useEffect(() => {
+    if (!window.matchMedia) return undefined;
+    const mq = window.matchMedia(query);
+    const on = () => setNarrow(mq.matches);
+    on();
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, [query]);
+  return narrow;
+}
+
+/** Width in pixels of an element, kept current as the window changes. */
+function useElementWidth(el) {
+  const [w, setW] = useState(0);
+  useEffect(() => {
+    if (!el) return undefined;
+    setW(el.clientWidth);
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(() => setW(el.clientWidth));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [el]);
+  return w;
+}
 
 /** Day-by-day list of an event's steps and serve times, with dish colors. */
 function Timeline({ meals, dishes, steps, colorOf }) {
@@ -112,14 +145,20 @@ function Timeline({ meals, dishes, steps, colorOf }) {
   ));
 }
 
-export default function EventView({ isOwner, canEdit, ownerUid }) {
+export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, onCloseSettings }) {
+  const narrow = useNarrow();
   const [events, setEvents] = useState(undefined); // undefined = loading
   const [detail, setDetail] = useState(null);
   const [tab, setTab] = useState(() => readStored(TAB_KEY, ['plan', 'menu', 'shopping'], 'plan'));
-  const [view, setView] = useState(() => readStored(VIEW_KEY, ['week', 'day', 'timeline'], 'week'));
+  // Phones open on the Day view; the wide Week grid is for bigger screens.
+  const [view, setView] = useState(() =>
+    readStored(VIEW_KEY, ['week', 'day', 'timeline'], typeof window !== 'undefined' && window.innerWidth <= NARROW_PX ? 'day' : 'week'),
+  );
   const [rows, setRows] = useState(() => readStored(ROWS_KEY, Object.keys(ROW_HEIGHTS), 'normal'));
   const [day, setDay] = useState(null);
   const [menuOpenId, setMenuOpenId] = useState(null);
+  const [dayWrap, setDayWrap] = useState(null);
+  const dayWrapWidth = useElementWidth(dayWrap);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -237,6 +276,24 @@ export default function EventView({ isOwner, canEdit, ownerUid }) {
     }
   }
 
+  // Move a dinner and every step of its dishes by the same amount (all saved together).
+  async function changeMealTime(meal, serveAt) {
+    const plan = planMealMove(meal, serveAt, detail.dishes, detail.steps);
+    const byId = Object.fromEntries(plan.patches.map((p) => [p.id, p.startAt]));
+    setDetail((d) => ({
+      ...d,
+      meals: d.meals.map((m) => (m.id === meal.id ? { ...m, serveAt } : m)),
+      steps: d.steps.map((s) => (byId[s.id] ? { ...s, startAt: byId[s.id] } : s)),
+    }));
+    try {
+      await moveMeal(current.id, meal.id, serveAt, plan.patches);
+      setError('');
+    } catch (e) {
+      setError(e.message);
+      load();
+    }
+  }
+
   async function createStep(dish, kind) {
     const mine = detail.steps.filter((s) => s.dishId === dish.id);
     const meal = detail.meals.find((m) => m.id === dish.mealId);
@@ -305,6 +362,21 @@ export default function EventView({ isOwner, canEdit, ownerUid }) {
 
   if (events === undefined) return <p>Loading events…</p>;
 
+  if (settingsOpen && isOwner) {
+    return (
+      <Settings
+        ownerUid={ownerUid}
+        current={current}
+        detail={detail}
+        busy={busy}
+        onClose={onCloseSettings}
+        onImportFile={importFile}
+        onReplaceSample={replaceSample}
+        onLoadSample={() => run(() => loadSampleEvent(SAMPLE_YEAR, ownerUid))}
+      />
+    );
+  }
+
   const tabBtn = (id, label) => (
     <button className={`tab ${tab === id ? 'active' : 'secondary'}`} onClick={() => pick(setTab, TAB_KEY, id)}>
       {label}
@@ -320,6 +392,10 @@ export default function EventView({ isOwner, canEdit, ownerUid }) {
       {label}
     </button>
   );
+
+  // On a phone the Day view is squeezed to the screen and uses taller rows so blocks stay readable.
+  const dayRowH = narrow ? Math.max(ROW_HEIGHTS[rows], ROW_HEIGHTS.large) : ROW_HEIGHTS[rows];
+  const fitWidth = narrow && dayWrapWidth ? Math.max(200, dayWrapWidth - PHONE_GUTTER) : null;
 
   const calendarProps = detail && {
     event: current,
@@ -364,7 +440,7 @@ export default function EventView({ isOwner, canEdit, ownerUid }) {
                   {viewBtn('day', 'Day')}
                   {viewBtn('timeline', 'Timeline')}
                 </span>
-                {view !== 'timeline' && (
+                {view !== 'timeline' && !(narrow && view === 'day') && (
                   <span className="rowpick">
                     <span className="muted">Row height</span> {rowBtn('compact', 'S')}
                     {rowBtn('normal', 'M')}
@@ -440,21 +516,21 @@ export default function EventView({ isOwner, canEdit, ownerUid }) {
                       →
                     </button>
                   </p>
-                  <div className="cal-wrap">
+                  <div className="day-wrap" ref={setDayWrap}>
                     <BlockCalendar
                       {...calendarProps}
+                      rowH={dayRowH}
                       onlyDay={activeDay}
                       unitW={150}
-                      side={
-                        <DayAgenda
-                          day={activeDay}
-                          steps={detail.steps}
-                          dishes={detail.dishes}
-                          meals={detail.meals}
-                          colorOf={colorOf}
-                          onOpenDish={openDish}
-                        />
-                      }
+                      fitWidth={fitWidth}
+                    />
+                    <DayAgenda
+                      day={activeDay}
+                      steps={detail.steps}
+                      dishes={detail.dishes}
+                      meals={detail.meals}
+                      colorOf={colorOf}
+                      onOpenDish={openDish}
                     />
                   </div>
                 </>
@@ -479,6 +555,7 @@ export default function EventView({ isOwner, canEdit, ownerUid }) {
               onUpdateStep={patchStep}
               onAddStep={createStep}
               onDeleteStep={removeStep}
+              onMoveMeal={changeMealTime}
             />
           )}
 
@@ -489,31 +566,8 @@ export default function EventView({ isOwner, canEdit, ownerUid }) {
       ) : (
         <>
           <h2>Events</h2>
-          <p className="muted">No event yet.</p>
+          <p className="muted">No event yet.{isOwner ? ' Open Settings (the gear, top right) to import the menu file.' : ''}</p>
         </>
-      )}
-
-      {isOwner && (
-        <div className="owner-tools">
-          <h3>Owner tools</h3>
-          <p>
-            <label className="file-btn">
-              Import menu file…
-              <input type="file" accept=".json,application/json" onChange={importFile} disabled={busy} />
-            </label>
-            {!current && (
-              <button disabled={busy} onClick={() => run(() => loadSampleEvent(SAMPLE_YEAR, ownerUid))}>
-                Load sample event ({SAMPLE_YEAR})
-              </button>
-            )}
-            {current && current.id === eventId(SAMPLE_YEAR) && !(detail && detail.dishes.some((d) => d.ingredients)) && (
-              <button className="danger" disabled={busy} onClick={replaceSample}>
-                Replace sample event
-              </button>
-            )}
-          </p>
-          <p className="muted">Import replaces the whole {SAMPLE_YEAR} event with the file you pick (meals, recipes, blocks, shopping list).</p>
-        </div>
       )}
     </section>
   );

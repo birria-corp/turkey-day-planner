@@ -33,6 +33,13 @@ export function diffMinutes(a, b) {
   return Math.round((parseStamp(b) - parseStamp(a)) / 60000);
 }
 
+/** "2026-11-26T15:00" -> "Thursday, November 26, 2026 at 3:00 PM". */
+export function fmtWhen(stamp) {
+  const d = parseStamp(stamp);
+  const day = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  return `${day} at ${fmtTime(stamp)}`;
+}
+
 /** "2026-11-26T13:00" -> "1:00 PM". */
 export function fmtTime(stamp) {
   const d = parseStamp(stamp);
