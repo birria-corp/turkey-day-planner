@@ -36,6 +36,7 @@ const fmtDayLabel = (key) =>
  * - Click a block to open its pop-over (Done button, Open recipe); cooks and owner can drag it to another time or day (15-minute snap,
  *   Escape cancels) or focus it and use the arrow keys (15 min per press, Shift = 1 hour, Left/Right = 1 day).
  * - collapseEmpty (Week view with Hide completed): days with no blocks, serve bar or long bar are left out.
+ * - trimHours (with Hide completed): the grid height shrinks to 10 AM to 10 PM, widened for any open block outside that.
  * `side` is rendered right of the last day.
  */
 export default function BlockCalendar({
@@ -51,6 +52,7 @@ export default function BlockCalendar({
   unitW = 96,
   fitWidth = null,
   collapseEmpty = false,
+  trimHours = false,
   canEdit = false,
   conflictIds = null,
   onOpenDish,
@@ -125,7 +127,14 @@ export default function BlockCalendar({
     const widths = days.map((k) => (fitWidth && onlyDay ? fitWidth : Math.max(MIN_DAY_W, layouts[k].units * unitW)));
     const offsets = widths.reduce((acc, w, i) => [...acc, (acc[i] || 0) + w], [0]);
 
-    const range = gridRange([...stepBlocks, ...serveBlocks]);
+    const rangeBlocks = [...stepBlocks, ...serveBlocks];
+    let range = gridRange(rangeBlocks);
+    if (trimHours) {
+      // Hide completed: the grid shrinks to 10 AM to 10 PM (this day's blocks only, in the Day view),
+      // widening to the hour around any open block outside that.
+      const mine = onlyDay ? rangeBlocks.filter((b) => dayKey(b.startAt) === onlyDay) : rangeBlocks;
+      range = gridRange(mine, { defaultStartHour: 10, defaultEndHour: 22 });
+    }
     const span = range.endMin - range.startMin;
     const frac = (min) => Math.min(1, Math.max(0, (min - range.startMin) / span));
     const px = (stamp) => {
@@ -176,7 +185,7 @@ export default function BlockCalendar({
     });
 
     return { days, layouts, serveByDay, widths, range, bars, laneCount: laneEnds.length, longToday, dayDishes };
-  }, [event, meals, steps, labelOf, textOf, onlyDay, unitW, fitWidth, collapseEmpty]);
+  }, [event, meals, steps, labelOf, textOf, onlyDay, unitW, fitWidth, collapseEmpty, trimHours]);
 
   const { days, layouts, serveByDay, widths, range, bars, laneCount, longToday, dayDishes } = model;
 

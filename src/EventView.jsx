@@ -608,6 +608,7 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
     conflictIds,
     onOpenDish: openDish,
     onSelectStep: setSelectedStepId,
+    trimHours: hideDone,
     onMoveStep: (stepId, startAt) => patchStep(stepId, { startAt }),
   };
 
