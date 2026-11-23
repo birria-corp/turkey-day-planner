@@ -151,7 +151,7 @@ export function StepRow({ step, canEdit, onUpdate, onDelete }) {
   );
 }
 
-function Detail({ dish, meal, steps, color, canEdit, onScaleChange, onNotesChange, onUpdateStep, onAddStep, onDeleteStep, onPrint, onBack }) {
+function Detail({ dish, meal, steps, color, canEdit, onScaleChange, onNotesChange, onUpdateStep, onAddStep, onDeleteStep, onRemove, onPrint, onBack }) {
   const scale = dish.scale ?? 1;
   const b = blocksFor(dish.id, steps);
   const sums = ['prep', 'assemble', 'cook'].map((k) => [
@@ -167,6 +167,11 @@ function Detail({ dish, meal, steps, color, canEdit, onScaleChange, onNotesChang
         <button className="secondary" onClick={onPrint}>
           🖨 Print this recipe
         </button>
+        {canEdit && (
+          <button className="secondary danger" onClick={() => onRemove(dish)}>
+            🗑 Remove item
+          </button>
+        )}
       </p>
       <h2 style={{ borderLeft: `8px solid ${color.bg}`, paddingLeft: 10 }}>
         {dish.emoji} {dish.title}
@@ -280,6 +285,85 @@ function Detail({ dish, meal, steps, color, canEdit, onScaleChange, onNotesChang
   );
 }
 
+/** Add item: pick the dinner, then start blank or copy an existing dish (recipe, scale and blocks move to that dinner's day). */
+function AddItem({ meals, dishes, onAddDish }) {
+  const orderedMeals = [...meals].sort((a, b) => (a.serveAt < b.serveAt ? -1 : 1));
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [title, setTitle] = useState('');
+  const [mealId, setMealId] = useState('');
+  const [sourceId, setSourceId] = useState('');
+  const targetId = mealId || (orderedMeals[0] && orderedMeals[0].id) || '';
+
+  async function add() {
+    setBusy(true);
+    await onAddDish({ title: title.trim(), mealId: targetId, sourceId });
+    setBusy(false);
+    setOpen(false);
+    setTitle('');
+    setSourceId('');
+  }
+
+  if (!open) {
+    return (
+      <button className="secondary" onClick={() => setOpen(true)}>
+        + Add item
+      </button>
+    );
+  }
+  return (
+    <div className="pick-box">
+      <p>
+        <label>
+          Dinner{' '}
+          <select value={targetId} onChange={(e) => setMealId(e.target.value)}>
+            {orderedMeals.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </p>
+      <p>
+        <label>
+          Start from{' '}
+          <select value={sourceId} onChange={(e) => setSourceId(e.target.value)}>
+            <option value="">Blank dish</option>
+            {sortDishes(dishes).map((d) => (
+              <option key={d.id} value={d.id}>
+                Copy of {d.title}
+              </option>
+            ))}
+          </select>
+        </label>
+      </p>
+      <p>
+        <label>
+          Name{' '}
+          <input
+            value={title}
+            placeholder={sourceId ? 'Leave empty to name it after the copy' : 'Dish name'}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+        </label>
+      </p>
+      <p className="muted small-note">
+        A copy brings the recipe, scale, cook and blocks, shifted to the chosen dinner. Drag the blocks on the Plan to
+        fit. A backup file downloads first.
+      </p>
+      <p>
+        <button disabled={busy || (!sourceId && !title.trim())} onClick={add}>
+          {busy ? 'Adding…' : 'Add item'}
+        </button>
+        <button className="secondary" onClick={() => setOpen(false)}>
+          Cancel
+        </button>
+      </p>
+    </div>
+  );
+}
+
 /** One dinner: its current date and time, and a field to move it (with all its dishes' blocks). */
 function DinnerRow({ meal, dishes, steps, canEdit, onMoveMeal }) {
   const [value, setValue] = useState(meal.serveAt);
@@ -337,6 +421,8 @@ export default function MenuView({
   onAddStep,
   onDeleteStep,
   onMoveMeal,
+  onAddDish,
+  onRemoveDish,
 }) {
   const [preview, setPreview] = useState(null); // { ids: null (all) | [dish ids] }: show the print preview
   const [picking, setPicking] = useState(false); // the "select recipes to print" checklist
@@ -372,6 +458,7 @@ export default function MenuView({
         onUpdateStep={onUpdateStep}
         onAddStep={onAddStep}
         onDeleteStep={onDeleteStep}
+        onRemove={onRemoveDish}
         onPrint={() => setPreview({ ids: [open.id] })}
         onBack={() => onOpenChange(null)}
       />
@@ -399,6 +486,11 @@ export default function MenuView({
         ))}
 
       <h3>Dishes</h3>
+      {canEdit && (
+        <p>
+          <AddItem meals={meals} dishes={dishes} onAddDish={onAddDish} />
+        </p>
+      )}
       <p>
         <button className="secondary" onClick={() => setPicking((v) => !v)}>
           ☑ Select recipes to print

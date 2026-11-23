@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { rebuildShopping, subscribeShopping, updateShoppingItem } from './events.js';
 import { buildKeepText, groupByAisle } from './shopping.js';
 import { PrintShell, ShoppingPrint } from './PrintViews.jsx';
+import { fmtRange } from './labels.js';
 import { canShare, copyText, shareText } from './clipboard.js';
 
 function Row({ item, checked, disabled, onToggle, label }) {
@@ -34,7 +35,26 @@ function Aisles({ items, renderRow }) {
 }
 
 /** Shopping tab. Pass 1: tick what you already have. Pass 2: take the rest to the store and tick it into the cart. */
-export default function ShoppingView({ eventId, dishes, canEdit }) {
+function Errands({ errands, canEdit, onToggleDone }) {
+  if (!errands || errands.length === 0) return null;
+  const left = errands.filter((e) => !e.done).length;
+  return (
+    <div className="errands-box">
+      <h3>Errands</h3>
+      <p className="muted">
+        {left} of {errands.length} still to do.{!canEdit && ' Only cooks and the owner can tick these.'}
+      </p>
+      {errands.map((e) => (
+        <label key={e.id} className={`shop-row${e.done ? ' done' : ''}`}>
+          <input type="checkbox" checked={!!e.done} disabled={!canEdit} onChange={() => onToggleDone(e)} />{' '}
+          <span className="shop-name">{e.text}</span> <span className="muted">{fmtRange(e.startAt, e.durationMin)}</span>
+        </label>
+      ))}
+    </div>
+  );
+}
+
+export default function ShoppingView({ eventId, dishes, canEdit, errands = [], onToggleDone }) {
   const [items, setItems] = useState(null);
   const [mode, setMode] = useState('pantry');
   const [error, setError] = useState('');
@@ -87,6 +107,7 @@ export default function ShoppingView({ eventId, dishes, canEdit }) {
     return (
       <div>
         {error && <p className="error">{error}</p>}
+        <Errands errands={errands} canEdit={canEdit} onToggleDone={onToggleDone} />
         <p className="muted">No shopping list yet. The owner builds it by importing the menu file on the Plan tab.</p>
       </div>
     );
@@ -140,6 +161,8 @@ export default function ShoppingView({ eventId, dishes, canEdit }) {
         </button>
         {note && <span className="muted">{note}</span>}
       </p>
+
+      <Errands errands={errands} canEdit={canEdit} onToggleDone={onToggleDone} />
 
       {mode === 'pantry' ? (
         <>

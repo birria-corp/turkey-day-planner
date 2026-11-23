@@ -47,3 +47,27 @@ describe('describeDelta', () => {
     expect(describeDelta(0)).toBe('no change');
   });
 });
+
+import { mealName, namedMeals } from './meal.js';
+
+describe('meal names follow the day', () => {
+  it('names a dinner after its weekday', () => {
+    expect(mealName({ serveAt: '2026-11-27T15:00' })).toBe('Friday Dinner');
+    expect(mealName({ serveAt: '2026-11-26T16:00' })).toBe('Thursday Dinner');
+  });
+  it('renames Saturday Dinner when it moves to Friday', () => {
+    const out = namedMeals([{ id: 'sat', name: 'Saturday Dinner', serveAt: '2026-11-27T15:00' }]);
+    expect(out[0].name).toBe('Friday Dinner');
+  });
+  it('leaves a custom name alone', () => {
+    const out = namedMeals([{ id: 'x', name: 'Family Feast', serveAt: '2026-11-27T15:00' }]);
+    expect(out[0].name).toBe('Family Feast');
+  });
+  it('tells two dinners on one day apart', () => {
+    const out = namedMeals([
+      { id: 'a', name: 'Thursday Dinner', serveAt: '2026-11-26T12:00' },
+      { id: 'b', name: 'Friday Dinner', serveAt: '2026-11-26T18:00' },
+    ]);
+    expect(out.map((m) => m.name)).toEqual(['Thursday Dinner', 'Thursday Dinner 2']);
+  });
+});

@@ -33,7 +33,7 @@ const fmtDayLabel = (key) =>
  * - Rows are `rowH` pixels per 30 minutes (taller beats wider).
  * - Busy days split into fixed lanes (Prep & Assemble | Stovetop | Oven), each only as wide as its overlap needs.
  * - Long steps (brine, air-dry) run across the days as bars; in a single-day view they are listed instead.
- * - Click a block to open its recipe; cooks and owner can drag it to another time or day (15-minute snap,
+ * - Click a block to open its pop-over (Done button, Open recipe); cooks and owner can drag it to another time or day (15-minute snap,
  *   Escape cancels) or focus it and use the arrow keys (15 min per press, Shift = 1 hour, Left/Right = 1 day).
  * `side` is rendered right of the last day.
  */
@@ -52,6 +52,7 @@ export default function BlockCalendar({
   canEdit = false,
   conflictIds = null,
   onOpenDish,
+  onSelectStep,
   onMoveStep,
   side,
 }) {
@@ -131,6 +132,7 @@ export default function BlockCalendar({
             return {
               id: `l-${s.id}`,
               dishId: s.dishId,
+              stepId: s.id,
               label: labelOf(s),
               title: `${labelOf(s)}: ${fmtTime(s.startAt)} to ${fmtTime(endStamp)}`,
               from: px(s.startAt),
@@ -172,7 +174,7 @@ export default function BlockCalendar({
   // ---- drag and drop -------------------------------------------------------
   const colRefs = useRef({});
   const latest = useRef({});
-  latest.current = { range, rowH, days, onMoveStep, onOpenDish };
+  latest.current = { range, rowH, days, onMoveStep, onOpenDish, onSelectStep };
   const suppressClick = useRef(false);
   const [drag, setDrag] = useState(null); // { stepId, key, min, durationMin, line1 }
 
@@ -235,7 +237,8 @@ export default function BlockCalendar({
 
   function open(b) {
     if (suppressClick.current) return;
-    if (b.dishId && onOpenDish) onOpenDish(b.dishId);
+    if (b.stepId && onSelectStep) onSelectStep(b.stepId);
+    else if (b.dishId && onOpenDish) onOpenDish(b.dishId);
   }
 
   function onKey(e, b) {
@@ -288,7 +291,7 @@ export default function BlockCalendar({
                   key={b.id}
                   className="bar"
                   title={b.title}
-                  onClick={() => b.dishId && onOpenDish && onOpenDish(b.dishId)}
+                  onClick={() => (onSelectStep ? onSelectStep(b.stepId) : b.dishId && onOpenDish && onOpenDish(b.dishId))}
                   style={{
                     left: b.from,
                     width: Math.max(40, b.to - b.from),

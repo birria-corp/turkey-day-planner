@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { flushSync } from 'react-dom';
 import {
+  addDish,
   addStep,
+  deleteDish,
   deleteEvent,
   deleteStep,
   fetchEventDetail,
@@ -10,6 +12,7 @@ import {
   importEvent,
   loadSampleEvent,
   moveMeal,
+  rebuildShopping,
   subscribeEventDetail,
   updateEventCooks,
   updateDishCook,
@@ -24,11 +27,13 @@ import DinnerPanel, { COOK_CHOICES } from './DinnerPanel.jsx';
 import MenuView from './MenuView.jsx';
 import Settings from './Settings.jsx';
 import ShoppingView from './ShoppingView.jsx';
-import { EVENT_COLOR, dishColor, sortDishes } from './palette.js';
+import StepPopover from './StepPopover.jsx';
+import { buildNewDish, copyTitle } from './newDish.js';
+import { EVENT_COLOR, PALETTE, dishColor, sortDishes } from './palette.js';
 import { KIND_MARKER, KIND_NAME, blockText, stepLabel } from './labels.js';
 import { daysInRange } from './scheduler/dates.js';
 import { findConflicts } from './scheduler/conflicts.js';
-import { planMealMove } from './scheduler/meal.js';
+import { namedMeals, planMealMove } from './scheduler/meal.js';
 import { addMinutes, dayKey, fmtDayHeading, fmtTime } from './scheduler/time.js';
 
 const SAMPLE_YEAR = 2026;
@@ -157,7 +162,10 @@ function Timeline({ meals, dishes, steps, colorOf }) {
 export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, onCloseSettings, onEventYear }) {
   const narrow = useNarrow();
   const [events, setEvents] = useState(undefined); // undefined = loading
-  const [detail, setDetail] = useState(null);
+  const [rawDetail, setDetail] = useState(null);
+  // Dinner names follow their dates: moving Saturday Dinner to Friday makes it "Friday Dinner" everywhere.
+  const detail = useMemo(() => (rawDetail ? { ...rawDetail, meals: namedMeals(rawDetail.meals) } : null), [rawDetail]);
+  const [selectedStepId, setSelectedStepId] = useState(null); // the Plan block whose pop-over is open
   const [tab, setTab] = useState(() => readStored(TAB_KEY, ['plan', 'menu', 'shopping'], 'plan'));
   // Phones open on the Day view; the wide Week grid is for bigger screens.
   const [view, setView] = useState(() =>
@@ -326,7 +334,7 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
       steps: d.steps.map((s) => (byId[s.id] ? { ...s, startAt: byId[s.id] } : s)),
     }));
     try {
-      await moveMeal(current.id, meal.id, serveAt, plan.patches);
+      await moveMeal(current.id, meal.id, serveAt, plan.patches, namedMeals([{ ...meal, serveAt }])[0].name);
       setError('');
     } catch (e) {
       setError(e.message);
@@ -361,6 +369,49 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
     try {
       await deleteStep(current.id, step.id);
       setDetail((d) => ({ ...d, steps: d.steps.filter((s) => s.id !== step.id) }));
+      setError('');
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  // Add item: a blank dish, or a copy of an existing one (recipe, scale and its steps moved to the new dinner's day).
+  async function createDish({ title, mealId, sourceId }) {
+    const targetMeal = detail.meals.find((m) => m.id === mealId);
+    const source = sourceId ? detail.dishes.find((d) => d.id === sourceId) : null;
+    const used = new Set(detail.dishes.map((d) => d.color));
+    const freeColor = Object.keys(PALETTE).find((k) => !used.has(k)) || '';
+    const order = detail.dishes.reduce((m, d) => Math.max(m, d.order ?? 0), 0) + 1;
+    const { dish, steps } = buildNewDish({
+      title: title || (source ? copyTitle(source, targetMeal) : 'New dish'),
+      targetMeal,
+      order,
+      source,
+      sourceMeal: source ? detail.meals.find((m) => m.id === source.mealId) : null,
+      sourceSteps: source ? detail.steps.filter((s) => s.dishId === source.id) : [],
+      color: freeColor,
+    });
+    try {
+      await downloadBackup();
+      const newId = await addDish(current.id, dish, steps);
+      await rebuildShopping(current.id, [...detail.dishes, { id: newId, ...dish }]);
+      setError('');
+      setMenuOpenId(newId);
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  // Remove item: the dish and all of its steps, then the shopping list is rebuilt (ticks kept).
+  async function removeDish(dish) {
+    const mine = detail.steps.filter((s) => s.dishId === dish.id);
+    if (!window.confirm(`Remove "${dish.title}" and its ${mine.length} blocks from the plan? A backup file downloads first.`)) return;
+    try {
+      await downloadBackup();
+      await deleteDish(current.id, dish.id, mine.map((s) => s.id));
+      const rest = detail.dishes.filter((d) => d.id !== dish.id);
+      if (rest.length) await rebuildShopping(current.id, rest);
+      setMenuOpenId(null);
       setError('');
     } catch (e) {
       setError(e.message);
@@ -547,6 +598,7 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
     canEdit,
     conflictIds,
     onOpenDish: openDish,
+    onSelectStep: setSelectedStepId,
     onMoveStep: (stepId, startAt) => patchStep(stepId, { startAt }),
   };
 
@@ -555,6 +607,20 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
   return (
     <section>
       {error && <p className="error">{error}</p>}
+      {detail && selectedStepId && detail.steps.some((s) => s.id === selectedStepId) && (
+        <StepPopover
+          step={detail.steps.find((s) => s.id === selectedStepId)}
+          dish={dishById[detail.steps.find((s) => s.id === selectedStepId).dishId]}
+          color={colorOf(detail.steps.find((s) => s.id === selectedStepId).dishId)}
+          canEdit={canEdit}
+          onToggleDone={toggleDone}
+          onOpenDish={(id) => {
+            setSelectedStepId(null);
+            openDish(id);
+          }}
+          onClose={() => setSelectedStepId(null)}
+        />
+      )}
       {current ? (
         <>
           <p className="muted dates-line">
@@ -704,11 +770,19 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
               onAddStep={createStep}
               onDeleteStep={removeStep}
               onMoveMeal={changeMealTime}
+              onAddDish={createDish}
+              onRemoveDish={removeDish}
             />
           )}
 
           {tab === 'shopping' && detail && (
-            <ShoppingView eventId={current.id} dishes={detail.dishes} canEdit={canEdit} />
+            <ShoppingView
+              eventId={current.id}
+              dishes={detail.dishes}
+              canEdit={canEdit}
+              errands={detail.steps.filter((s) => !s.dishId).sort((a, b) => (a.startAt < b.startAt ? -1 : 1))}
+              onToggleDone={toggleDone}
+            />
           )}
         </>
       ) : (

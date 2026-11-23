@@ -494,3 +494,13 @@ button.small { padding: 3px 8px; font-size: 13px; margin-right: 0; }
   button { padding: 10px 14px; }
   .shop-row { padding: 10px 4px; }
 }
+
+/* Plan block pop-over */
+.pop-back { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 16px; }
+.pop { background: var(--bg, #fff); color: inherit; border: 1px solid var(--border); border-top: 8px solid var(--border); border-radius: 10px; padding: 14px 16px; width: min(420px, 100%); box-shadow: 0 8px 28px rgba(0, 0, 0, 0.3); }
+.pop-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; font-size: 1.1em; }
+.pop-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+.pop-done { font-size: 1.1em; padding: 12px 18px; min-height: 48px; }
+.pop-done.undo { opacity: 0.8; }
+.errands-box { margin-bottom: 12px; }
+button.danger { color: #9a2a1f; }

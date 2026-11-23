@@ -148,10 +148,28 @@ export function deleteStep(id, stepId) {
 }
 
 /** Move a dinner: set its serve time and the new start times of its dishes' steps, all or nothing. */
-export async function moveMeal(id, mealId, serveAt, patches) {
+export async function moveMeal(id, mealId, serveAt, patches, name) {
   const batch = writeBatch(db);
-  batch.update(doc(db, 'events', id, 'meals', mealId), { serveAt });
+  batch.update(doc(db, 'events', id, 'meals', mealId), name ? { serveAt, name } : { serveAt });
   patches.forEach((p) => batch.update(doc(db, 'events', id, 'steps', p.id), { startAt: p.startAt }));
+  await track(batch.commit());
+}
+
+/** Add a dish and its steps together (all or nothing). `dish` has no id; returns the new dish id. */
+export async function addDish(id, dish, steps) {
+  const dishRef = doc(collection(db, 'events', id, 'dishes'));
+  const batch = writeBatch(db);
+  batch.set(dishRef, dish);
+  steps.forEach((s) => batch.set(doc(collection(db, 'events', id, 'steps')), { ...s, dishId: dishRef.id }));
+  await track(batch.commit());
+  return dishRef.id;
+}
+
+/** Delete a dish and all of its steps together. Caller confirms first and rebuilds the shopping list after. */
+export async function deleteDish(id, dishId, stepIds) {
+  const batch = writeBatch(db);
+  batch.delete(doc(db, 'events', id, 'dishes', dishId));
+  stepIds.forEach((sid) => batch.delete(doc(db, 'events', id, 'steps', sid)));
   await track(batch.commit());
 }
 
