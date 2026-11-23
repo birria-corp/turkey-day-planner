@@ -35,6 +35,7 @@ const fmtDayLabel = (key) =>
  * - Long steps (brine, air-dry) run across the days as bars; in a single-day view they are listed instead.
  * - Click a block to open its pop-over (Done button, Open recipe); cooks and owner can drag it to another time or day (15-minute snap,
  *   Escape cancels) or focus it and use the arrow keys (15 min per press, Shift = 1 hour, Left/Right = 1 day).
+ * - collapseEmpty (Week view with Hide completed): days with no blocks, serve bar or long bar are left out.
  * `side` is rendered right of the last day.
  */
 export default function BlockCalendar({
@@ -49,6 +50,7 @@ export default function BlockCalendar({
   onlyDay = null,
   unitW = 96,
   fitWidth = null,
+  collapseEmpty = false,
   canEdit = false,
   conflictIds = null,
   onOpenDish,
@@ -103,11 +105,18 @@ export default function BlockCalendar({
     });
 
     const keys = new Set([...Object.keys(grouped), ...Object.keys(serveByDay)]);
-    daysInRange(parseKey(event.startDate), parseKey(event.endDate)).forEach((d) => keys.add(d.iso));
+    if (!collapseEmpty) daysInRange(parseKey(event.startDate), parseKey(event.endDate)).forEach((d) => keys.add(d.iso));
     longSteps.forEach((s) => {
       keys.add(dayKey(s.startAt));
       keys.add(dayKey(addMinutes(s.startAt, s.durationMin)));
+      // A long bar keeps every day it crosses when empty days are collapsed.
+      if (collapseEmpty) {
+        const last = parseKey(dayKey(addMinutes(s.startAt, s.durationMin)));
+        daysInRange(parseKey(dayKey(s.startAt)), last).forEach((d) => keys.add(d.iso));
+      }
     });
+    // Nothing left to show: fall back to the whole event so the grid never goes blank.
+    if (collapseEmpty && keys.size === 0) daysInRange(parseKey(event.startDate), parseKey(event.endDate)).forEach((d) => keys.add(d.iso));
     const allDays = [...keys].sort();
     const days = onlyDay ? allDays.filter((k) => k === onlyDay) : allDays;
 
@@ -167,7 +176,7 @@ export default function BlockCalendar({
     });
 
     return { days, layouts, serveByDay, widths, range, bars, laneCount: laneEnds.length, longToday, dayDishes };
-  }, [event, meals, steps, labelOf, textOf, onlyDay, unitW, fitWidth]);
+  }, [event, meals, steps, labelOf, textOf, onlyDay, unitW, fitWidth, collapseEmpty]);
 
   const { days, layouts, serveByDay, widths, range, bars, laneCount, longToday, dayDishes } = model;
 

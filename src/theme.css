@@ -504,3 +504,4 @@ button.small { padding: 3px 8px; font-size: 13px; margin-right: 0; }
 .pop-done.undo { opacity: 0.8; }
 .errands-box { margin-bottom: 12px; }
 button.danger { color: #9a2a1f; }
+.hide-done { white-space: nowrap; cursor: pointer; }

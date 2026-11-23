@@ -40,6 +40,7 @@ const SAMPLE_YEAR = 2026;
 const VIEW_KEY = 'tdp-view';
 const TAB_KEY = 'tdp-tab';
 const ROWS_KEY = 'tdp-rows';
+const HIDE_DONE_KEY = 'tdp-hide-done';
 const BACKUP_KEY = 'tdp-last-backup';
 const ROW_HEIGHTS = { compact: 30, normal: 48, large: 64 };
 const RESOURCE_WORD = { oven: 'Oven', stovetop: 'Stovetop', smoker: 'Smoker' };
@@ -165,6 +166,7 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
   const [rawDetail, setDetail] = useState(null);
   // Dinner names follow their dates: moving Saturday Dinner to Friday makes it "Friday Dinner" everywhere.
   const detail = useMemo(() => (rawDetail ? { ...rawDetail, meals: namedMeals(rawDetail.meals) } : null), [rawDetail]);
+  const [hideDone, setHideDone] = useState(() => readStored(HIDE_DONE_KEY, ['0', '1'], '0') === '1');
   const [selectedStepId, setSelectedStepId] = useState(null); // the Plan block whose pop-over is open
   const [tab, setTab] = useState(() => readStored(TAB_KEY, ['plan', 'menu', 'shopping'], 'plan'));
   // Phones open on the Day view; the wide Week grid is for bigger screens.
@@ -259,6 +261,13 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
   useEffect(() => {
     if (onEventYear) onEventYear(dinnerYear || null);
   }, [dinnerYear, onEventYear]);
+
+  // Hide completed: done blocks drop off every Plan view (the full list still feeds conflicts and the pop-over).
+  const planSteps = useMemo(
+    () => (detail ? (hideDone ? detail.steps.filter((s) => !s.done) : detail.steps) : []),
+    [detail, hideDone],
+  );
+  const doneCount = detail ? detail.steps.filter((s) => s.done).length : 0;
 
   const conflicts = useMemo(() => (detail ? findConflicts(detail.steps) : []), [detail]);
   const conflictIds = useMemo(() => new Set(conflicts.flatMap((c) => c.stepIds)), [conflicts]);
@@ -589,7 +598,7 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
   const calendarProps = detail && {
     event: current,
     meals: detail.meals,
-    steps: detail.steps,
+    steps: planSteps,
     colorOf,
     labelOf,
     textOf,
@@ -654,6 +663,17 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
                     {rowBtn('large', 'L')}
                   </span>
                 )}
+                <label className="hide-done">
+                  <input
+                    type="checkbox"
+                    checked={hideDone}
+                    onChange={(e) => {
+                      setHideDone(e.target.checked);
+                      store(HIDE_DONE_KEY, e.target.checked ? '1' : '0');
+                    }}
+                  />{' '}
+                  Hide completed{doneCount ? ` (${doneCount})` : ''}
+                </label>
                 <span className="muted legend">
                   {KIND_MARKER.prep} prep &nbsp; {KIND_MARKER.assemble} assemble &nbsp; {KIND_MARKER.cook} cook &nbsp;{' '}
                   {KIND_MARKER.rest} rest &nbsp; {KIND_MARKER.event} errand
@@ -684,6 +704,7 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
                 <div className="cal-wrap print-fit">
                   <BlockCalendar
                     {...calendarProps}
+                    collapseEmpty={hideDone}
                     side={
                       <DinnerPanel
                         meals={detail.meals}
@@ -737,7 +758,7 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
                     />
                     <DayAgenda
                       day={activeDay}
-                      steps={detail.steps}
+                      steps={planSteps}
                       dishes={detail.dishes}
                       meals={detail.meals}
                       colorOf={colorOf}
@@ -750,7 +771,7 @@ export default function EventView({ isOwner, canEdit, ownerUid, settingsOpen, on
               )}
 
               {detail && view === 'timeline' && (
-                <Timeline meals={detail.meals} dishes={detail.dishes} steps={detail.steps} colorOf={colorOf} />
+                <Timeline meals={detail.meals} dishes={detail.dishes} steps={planSteps} colorOf={colorOf} />
               )}
             </div>
           )}
